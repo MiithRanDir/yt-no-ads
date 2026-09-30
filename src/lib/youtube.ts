@@ -5,14 +5,46 @@ export interface VideoItem {
   thumb: string
 }
 
-const TTL = 5 * 60 * 1000 // 5 นาที
+const SEARCH_TTL = 30 * 60 * 1000 // 30 นาที — search เปลี่ยนบ่อยแต่กันพิมพ์ซ้ำเผา quota
+const TRENDING_TTL = 2 * 60 * 60 * 1000 // 2 ชม. — trending เปลี่ยนช้า cache นานได้
+const MAX = 100 // ponytail: กัน Map โตไม่จำกัด ลบตัวเก่าสุดออก
 const cache = new Map<string, { at: number; data: VideoItem[] }>()
+
+function ttlFor(key: string) {
+  return key.startsWith('trending') ? TRENDING_TTL : SEARCH_TTL
+}
+
+// ponytail: persistent cache ลง localStorage รอด reload ประหยัด quota ได้เยอะ
+function lsGet(key: string): VideoItem[] | null {
+  try {
+    const raw = localStorage.getItem(`yt-cache:${key}`)
+    if (!raw) return null
+    const hit = JSON.parse(raw) as { at: number; data: VideoItem[] }
+    if (Date.now() - hit.at < ttlFor(key)) return hit.data
+    localStorage.removeItem(`yt-cache:${key}`)
+  } catch { /* storage เต็ม/ปิดไว้ก็ข้าม */ }
+  return null
+}
+
+function lsSet(key: string, data: VideoItem[]) {
+  try {
+    localStorage.setItem(`yt-cache:${key}`, JSON.stringify({ at: Date.now(), data }))
+  } catch { /* เต็มก็ช่าง */ }
+}
+
+function setCache(key: string, data: VideoItem[]) {
+  if (cache.size >= MAX) cache.delete(cache.keys().next().value as string)
+  cache.set(key, { at: Date.now(), data })
+  lsSet(key, data)
+}
 
 function getCache(key: string): VideoItem[] | null {
   const hit = cache.get(key)
-  if (hit && Date.now() - hit.at < TTL) return hit.data
-  cache.delete(key)
-  return null
+  if (hit) {
+    if (Date.now() - hit.at < ttlFor(key)) return hit.data
+    cache.delete(key)
+  }
+  return lsGet(key)
 }
 
 // ponytail: debounce แบบ function เดียว ไม่ใช้ lodash
@@ -91,7 +123,7 @@ export async function searchVideos(q: string): Promise<VideoItem[]> {
     const r = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
     if (r.ok) {
       const data = mapSearch(await r.json())
-      cache.set(key, { at: Date.now(), data })
+      setCache(key, data)
       return data
     }
   } catch {
@@ -103,7 +135,7 @@ export async function searchVideos(q: string): Promise<VideoItem[]> {
   if (!apiKey) throw new Error('ยังไม่ได้ตั้งค่า API key — ดู .env.example (VITE_YT_API_KEY) หรือตั้ง YT_API_KEY บน Vercel')
   const url = `${DIRECT}/search?part=snippet&type=video&maxResults=24&q=${encodeURIComponent(query)}&key=${apiKey}`
   const data = mapSearch(await fetchJson(url))
-  cache.set(key, { at: Date.now(), data })
+  setCache(key, data)
   return data
 }
 
@@ -116,7 +148,7 @@ export async function getTrending(): Promise<VideoItem[]> {
     const r = await fetch('/api/search?type=trending')
     if (r.ok) {
       const data = mapVideos(await r.json())
-      cache.set(key, { at: Date.now(), data })
+      setCache(key, data)
       return data
     }
   } catch {
@@ -127,6 +159,6 @@ export async function getTrending(): Promise<VideoItem[]> {
   if (!apiKey) return [] // หน้าแรกว่างได้ถ้าไม่มี key ไม่ต้อง throw
   const url = `${DIRECT}/videos?part=snippet,status&chart=mostPopular&regionCode=TH&maxResults=24&key=${apiKey}`
   const data = mapVideos(await fetchJson(url))
-  cache.set(key, { at: Date.now(), data })
+  setCache(key, data)
   return data
 }

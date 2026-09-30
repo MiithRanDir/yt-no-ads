@@ -26,5 +26,9 @@ export default async function handler(req: any, res: any) {
 
   const r = await fetch(url)
   const body = await r.json()
+  // ponytail: ให้ Vercel edge cache ช่วยกัน quota — search 10 นาที / trending 1 ชม.
+  res.setHeader('Cache-Control', type === 'trending'
+    ? 'public, s-maxage=3600, stale-while-revalidate=300'
+    : 'public, s-maxage=600, stale-while-revalidate=60')
   res.status(r.status).json(body)
 }
