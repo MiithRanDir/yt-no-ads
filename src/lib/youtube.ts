@@ -1,3 +1,5 @@
+import { addQuota, COST_SEARCH, COST_TRENDING } from './quota'
+
 export interface VideoItem {
   id: string
   title: string
@@ -124,6 +126,7 @@ export async function searchVideos(q: string): Promise<VideoItem[]> {
     if (r.ok) {
       const data = mapSearch(await r.json())
       setCache(key, data)
+      addQuota(COST_SEARCH) // นับเฉพาะยิงจริง ไม่นับ cache hit
       return data
     }
   } catch {
@@ -136,6 +139,7 @@ export async function searchVideos(q: string): Promise<VideoItem[]> {
   const url = `${DIRECT}/search?part=snippet&type=video&maxResults=24&q=${encodeURIComponent(query)}&key=${apiKey}`
   const data = mapSearch(await fetchJson(url))
   setCache(key, data)
+  addQuota(COST_SEARCH)
   return data
 }
 
@@ -149,6 +153,7 @@ export async function getTrending(): Promise<VideoItem[]> {
     if (r.ok) {
       const data = mapVideos(await r.json())
       setCache(key, data)
+      addQuota(COST_TRENDING)
       return data
     }
   } catch {
@@ -160,5 +165,6 @@ export async function getTrending(): Promise<VideoItem[]> {
   const url = `${DIRECT}/videos?part=snippet,status&chart=mostPopular&regionCode=TH&maxResults=24&key=${apiKey}`
   const data = mapVideos(await fetchJson(url))
   setCache(key, data)
+  addQuota(COST_TRENDING)
   return data
 }

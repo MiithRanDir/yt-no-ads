@@ -23,3 +23,4 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .error { background: #3d1113; color: #ff9a9a; padding: 10px 14px; border-radius: 8px; margin: 12px 0; }
 .loading { color: #aaa; padding: 20px 0; }
 .clear { background: transparent; color: #aaa; border: 0; cursor: pointer; font-size: 12px; }
+.quota { font-size: 12px; color: #aaa; background: #212121; padding: 6px 12px; border-radius: 14px; white-space: nowrap; }

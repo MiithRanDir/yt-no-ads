@@ -4,6 +4,7 @@ import VideoCard from './components/VideoCard'
 import Player from './components/Player'
 import { useHistory } from './hooks/useHistory'
 import { debounce, getTrending, searchVideos, type VideoItem } from './lib/youtube'
+import { getQuota, DAILY_LIMIT } from './lib/quota'
 
 export default function App() {
   const [videos, setVideos] = useState<VideoItem[]>([])
@@ -12,10 +13,14 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
+  const [quotaTick, setQuotaTick] = useState(0)
+  // ponytail: อ่าน quota ใหม่ทุก render ที่ tick เปลี่ยน ไม่ต้อง subscribe
+  const quota = getQuota()
+  void quotaTick
   const { history, push, clear } = useHistory()
 
   useEffect(() => {
-    getTrending().then(setTrending).catch(() => {})
+    getTrending().then((t) => { setTrending(t); setQuotaTick((n) => n + 1) }).catch(() => {})
   }, [])
 
   const doSearch = useCallback(async (q: string) => {
@@ -25,6 +30,7 @@ export default function App() {
     setSearched(true)
     try {
       setVideos(await searchVideos(q))
+      setQuotaTick((n) => n + 1)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ค้นหาไม่สำเร็จ')
     } finally {
@@ -50,6 +56,9 @@ export default function App() {
           <span>▶</span> YT No Ads
         </div>
         <SearchBar onSearch={(q) => { void doSearch(q) }} onType={(q) => { if (q.trim().length >= 3) debounced(q) }} />
+        <div className="quota" title={`ใช้ไป ${quota.used}/${DAILY_LIMIT} units รีเซ็ตเที่ยงคืน Pacific (search=100 trending=1 ไม่นับ cache hit)`}>
+          quota เหลือ ~{quota.remaining}/{DAILY_LIMIT}
+        </div>
       </div>
 
       {history.length > 0 && (
