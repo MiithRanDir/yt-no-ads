@@ -1,3 +1,1 @@
-{
-  "rewrites": [{ "source": "/api/:path*", "destination": "/api/:path*" }]
-}
+{"headers": [{"source": "/(.*)","headers": [{"key": "X-Robots-Tag","value": "noindex, nofollow, noarchive"}]}],"rewrites": [{"destination": "/api/:path*","source": "/api/:path*"}]}
