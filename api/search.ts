@@ -22,10 +22,12 @@ export default async function handler(req: any, res: any) {
       return
     }
     // ponytail: loop pageToken ฝั่ง server ทีเดียว ไม่ต้องยิงหลายรอบจาก client
+    // + fields กรองเฉพาะที่ใช้ (title/videoId/thumb/channel) — description เต็มๆ ทำให้ช้าจน timeout
+    const FIELDS = encodeURIComponent('items(snippet(title,resourceId/videoId,thumbnails/medium/url,channelTitle)),nextPageToken')
     const items: unknown[] = []
     let pageToken = ''
-    for (let i = 0; i < 4 && items.length < 200; i++) {
-      const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${encodeURIComponent(String(listId))}${pageToken ? `&pageToken=${pageToken}` : ''}&key=${key}`
+    for (let i = 0; i < 10 && items.length < 500; i++) {
+      const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&fields=${FIELDS}&playlistId=${encodeURIComponent(String(listId))}${pageToken ? `&pageToken=${pageToken}` : ''}&key=${key}`
       const r = await fetch(url)
       const body = await r.json() as { items?: unknown[]; nextPageToken?: string; error?: unknown }
       if (!r.ok) {
@@ -42,7 +44,7 @@ export default async function handler(req: any, res: any) {
       if (!pageToken) break
     }
     res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=300')
-    res.status(200).json({ items: items.slice(0, 200) })
+    res.status(200).json({ items: items.slice(0, 500) })
     return
   }
 

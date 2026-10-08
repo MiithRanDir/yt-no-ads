@@ -10,7 +10,7 @@ export interface Playlist {
 }
 
 export const MAX_PLAYLISTS = 20
-export const MAX_ITEMS = 200
+export const MAX_ITEMS = 500 // ponytail: 500 เพลง ~100KB อยู่ใน localStorage 5MB สบาย
 const KEY = 'yt-no-ads:playlists:v1'
 
 export function uid(): string {
