@@ -3,6 +3,7 @@
 export const DAILY_LIMIT = 10000
 export const COST_SEARCH = 100
 export const COST_TRENDING = 1
+export const COST_PLAYLIST = 1 // playlistItems.list = 1 unit/หน้า
 
 const KEY = 'yt-quota:v1'
 

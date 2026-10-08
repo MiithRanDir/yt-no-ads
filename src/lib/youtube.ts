@@ -1,4 +1,4 @@
-import { addQuota, COST_SEARCH, COST_TRENDING } from './quota'
+import { addQuota, COST_PLAYLIST, COST_SEARCH, COST_TRENDING } from './quota'
 
 export interface VideoItem {
   id: string
@@ -167,4 +167,47 @@ export async function getTrending(): Promise<VideoItem[]> {
   setCache(key, data)
   addQuota(COST_TRENDING)
   return data
+}
+
+// ponytail: import playlist ผ่าน proxy หน้าเดียว (server loop 4 หน้าให้แล้ว) นับ quota ตามจำนวนที่ได้
+function mapPlaylist(json: unknown): VideoItem[] {
+  const items = (json as { items?: unknown[] })?.items ?? []
+  return items
+    .map((it) => {
+      const v = it as {
+        snippet?: { title?: string; channelTitle?: string; resourceId?: { videoId?: string }; thumbnails?: { medium?: { url?: string } } }
+      }
+      const id = v.snippet?.resourceId?.videoId ?? ''
+      const title = v.snippet?.title ?? ''
+      if (!id || title === 'Private video' || title === 'Deleted video') return null
+      return {
+        id,
+        title: title || id,
+        channel: v.snippet?.channelTitle ?? '',
+        thumb: v.snippet?.thumbnails?.medium?.url ?? `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+      } as VideoItem
+    })
+    .filter(Boolean) as VideoItem[]
+}
+
+export async function fetchPlaylistItems(listId: string): Promise<VideoItem[]> {
+  if (!/^[A-Za-z0-9_-]+$/.test(listId)) throw new Error('ลิงก์ไม่ถูกต้อง: หา playlist id ไม่เจอ')
+  try {
+    const r = await fetch(`/api/search?type=playlist&listId=${encodeURIComponent(listId)}`)
+    if (!r.ok) quotaError(r.status)
+    const data = mapPlaylist(await r.json())
+    if (data.length === 0) throw new Error('เพลย์ลิสต์ว่าง / ส่วนตัว / ไม่มีสิทธิ์เข้าถึง')
+    addQuota(Math.max(1, Math.ceil(data.length / 50)) * COST_PLAYLIST)
+    return data
+  } catch (e) {
+    if (e instanceof Error && !e.message.startsWith('YouTube API')) throw e
+    // fallback ตรง (dev local): ดึงหน้าเดียว 50 รายการพอ
+    const apiKey = (import.meta.env.VITE_YT_API_KEY as string | undefined) ?? ''
+    if (!apiKey) throw e instanceof Error ? e : new Error('ดึงเพลย์ลิสต์ไม่สำเร็จ')
+    const url = `${DIRECT}/playlistItems?part=snippet&maxResults=50&playlistId=${encodeURIComponent(listId)}&key=${apiKey}`
+    const data = mapPlaylist(await fetchJson(url))
+    if (data.length === 0) throw new Error('เพลย์ลิสต์ว่าง / ส่วนตัว / ไม่มีสิทธิ์เข้าถึง')
+    addQuota(COST_PLAYLIST)
+    return data
+  }
 }

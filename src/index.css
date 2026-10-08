@@ -9,7 +9,7 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .search input { flex: 1; padding: 10px 14px; border-radius: 20px; border: 1px solid #333; background: #212121; color: #fff; font-size: 15px; }
 .search button { padding: 10px 18px; border-radius: 20px; border: 0; background: #fff; cursor: pointer; font-weight: 600; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
-.card { cursor: pointer; background: transparent; border: 0; padding: 0; text-align: left; color: inherit; }
+.card { cursor: pointer; background: transparent; border: 0; padding: 0; text-align: left; color: inherit; position: relative; }
 .card img { width: 100%; border-radius: 12px; aspect-ratio: 16/9; object-fit: cover; background: #222; }
 .card h3 { font-size: 14px; margin: 8px 0 4px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .card p { font-size: 12px; color: #aaa; margin: 0; }
@@ -25,3 +25,16 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .loading { color: #aaa; padding: 20px 0; }
 .clear { background: transparent; color: #aaa; border: 0; cursor: pointer; font-size: 12px; }
 .quota { font-size: 12px; color: #aaa; background: #212121; padding: 6px 12px; border-radius: 14px; white-space: nowrap; }
+.card .add { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(0,0,0,.7); color: #fff; font-size: 18px; cursor: pointer; line-height: 1; }
+.plist { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.plist button { background: #272727; color: #fff; border: 0; padding: 6px 12px; border-radius: 14px; cursor: pointer; font-size: 13px; }
+.plist button.on { background: #fff; color: #000; font-weight: 700; }
+.prow { display: inline-flex; gap: 4px; margin-left: 8px; }
+.prow.import { display: flex; margin: 8px 0; }
+.prow.import input { flex: 1; padding: 8px 12px; border-radius: 16px; border: 1px solid #333; background: #212121; color: #fff; font-size: 13px; }
+.prow.import button { padding: 8px 14px; border-radius: 16px; border: 0; background: #fff; cursor: pointer; font-weight: 600; white-space: nowrap; }
+.prow.import button:disabled { opacity: .5; }
+.queue { flex-direction: column; align-items: stretch; }
+.qitem { display: flex; gap: 4px; align-items: center; }
+.qitem button:first-child { flex: 1; text-align: left; }
+.muted { color: #777; font-size: 13px; }
