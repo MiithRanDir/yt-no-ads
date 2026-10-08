@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import SearchBar from './components/SearchBar'
 import VideoCard from './components/VideoCard'
 import Player from './components/Player'
+import PlaylistPicker from './components/PlaylistPicker'
 import { useHistory } from './hooks/useHistory'
 import { usePlaylists } from './hooks/usePlaylists'
 import { debounce, fetchPlaylistItems, getTrending, searchVideos, type VideoItem } from './lib/youtube'
 import { COST_PLAYLIST, getQuota, DAILY_LIMIT } from './lib/quota'
 import { parseYoutubeListId } from './lib/playlists'
+
+type Menu = 'home' | 'playlists'
 
 export default function App() {
   const [videos, setVideos] = useState<VideoItem[]>([])
@@ -22,13 +25,17 @@ export default function App() {
   const quota = getQuota()
   void quotaTick
   const { history, push, clear } = useHistory()
-  const { playlists, create, remove, addItem, removeItem, importItems, exportAll, importAll } = usePlaylists()
+  const { playlists, create, remove, rename, addItem, removeItem, importItems, exportAll, importAll } = usePlaylists()
+  const [menu, setMenu] = useState<Menu>('home')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [queue, setQueue] = useState<VideoItem[]>([])
   const [qi, setQi] = useState(0)
+  const [picker, setPicker] = useState<VideoItem | null>(null)
+  const [notice, setNotice] = useState('')
   const [importUrl, setImportUrl] = useState('')
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
+  const [renameVal, setRenameVal] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const active = playlists.find((p) => p.id === activeId) ?? null
 
@@ -49,10 +56,15 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [liveOnly])
 
   // ponytail: debounce 500ms ชั้นเดียวขณะพิมพ์ ไม่แยก hook
   const debounced = useMemo(() => debounce(doSearch, 500), [doSearch])
+
+  function flash(msg: string) {
+    setNotice(msg)
+    window.setTimeout(() => setNotice((m) => (m === msg ? '' : m)), 2500)
+  }
 
   function play(v: VideoItem) {
     setCurrent(v)
@@ -94,14 +106,28 @@ export default function App() {
     push(queue[n])
   }
 
-  function handleAdd(v: VideoItem) {
-    let pid = activeId
-    if (!pid) {
-      pid = create('เพลย์ลิสต์ 1').id
-      setActiveId(pid)
-    }
-    addItem(pid, v)
-    setQuotaTick((n) => n + 1) // rerender นับใหม่ ไม่เสีย quota
+  // popup + เลือก playlist (เช็คซ้ำอยู่ใน picker)
+  function pickAdd(pid: string) {
+    if (!picker) return
+    const p = playlists.find((x) => x.id === pid)
+    addItem(pid, picker)
+    flash(`เพิ่มลง “${p?.name ?? ''}” แล้ว`)
+    setPicker(null)
+  }
+
+  function pickCreate(name: string) {
+    if (!picker) return
+    const p = create(name)
+    addItem(p.id, picker)
+    flash(`สร้าง “${p.name}” + เพิ่มเพลงแล้ว`)
+    setPicker(null)
+  }
+
+  function openDetail(id: string) {
+    const p = playlists.find((x) => x.id === id)
+    setActiveId(id)
+    setRenameVal(p?.name ?? '')
+    setImportMsg('')
   }
 
   async function doImport() {
@@ -112,17 +138,10 @@ export default function App() {
     try {
       const items = await fetchPlaylistItems(listId)
       const cost = Math.max(1, Math.ceil(items.length / 50)) * COST_PLAYLIST
-      let pid = activeId
-      if (!pid) {
-        const p = create(`YT ${listId.slice(0, 8)}`, 'youtube')
-        pid = p.id
-        setActiveId(pid)
-      } else {
-        importItems(pid, items)
-      }
-      if (activeId) { /* importItems แล้วข้างบน */ } else {
-        importItems(pid, items)
-      }
+      const p = create(`YT ${listId.slice(0, 8)}`, 'youtube')
+      importItems(p.id, items)
+      setActiveId(p.id)
+      setRenameVal(p.name)
       setQuotaTick((n) => n + 1)
       setImportMsg(`นำเข้า ${items.length} คลิป (~${cost} units) สำเร็จ`)
       setImportUrl('')
@@ -147,6 +166,7 @@ export default function App() {
     try {
       const pls = importAll(await f.text())
       setActiveId(pls[0]?.id ?? null)
+      setRenameVal(pls[0]?.name ?? '')
       setImportMsg(`โหลดไฟล์ ${pls.length} เพลย์ลิสต์สำเร็จ`)
     } catch (e) {
       setImportMsg(e instanceof Error ? e.message : 'ไฟล์ไม่ถูกต้อง')
@@ -161,62 +181,27 @@ export default function App() {
         <div className="logo">
           <span>▶</span> YT No Ads
         </div>
-        <SearchBar onSearch={(q) => { lastQ.current = q; void doSearch(q) }} onType={(q) => { lastQ.current = q; if (q.trim().length >= 3) debounced(q) }} />
-        <label className="livecheck" title="ติ๊กแล้วค้นหาเฉพาะวิดีโอที่กำลังไลฟ์สด (eventType=live, cost เท่าเดิม 100 units)">
-          <input type="checkbox" checked={liveOnly} onChange={(e) => { const v = e.target.checked; setLiveOnly(v); if (searched && lastQ.current.trim()) void doSearch(lastQ.current, v) }} />
-          🔴 ไลฟ์สดอย่างเดียว
-        </label>
+        <nav className="tabs">
+          <button className={menu === 'home' ? 'on' : ''} onClick={() => setMenu('home')}>🏠 หน้าแรก</button>
+          <button className={menu === 'playlists' ? 'on' : ''} onClick={() => { setMenu('playlists'); setActiveId(null) }}>
+            🎵 เพลย์ลิสต์ ({playlists.length})
+          </button>
+        </nav>
+        {menu === 'home' && (
+          <>
+            <SearchBar onSearch={(q) => { lastQ.current = q; void doSearch(q) }} onType={(q) => { lastQ.current = q; if (q.trim().length >= 3) debounced(q) }} />
+            <label className="livecheck" title="ติ๊กแล้วค้นหาเฉพาะวิดีโอที่กำลังไลฟ์สด (eventType=live, cost เท่าเดิม 100 units)">
+              <input type="checkbox" checked={liveOnly} onChange={(e) => { const v = e.target.checked; setLiveOnly(v); if (searched && lastQ.current.trim()) void doSearch(lastQ.current, v) }} />
+              🔴 ไลฟ์สดอย่างเดียว
+            </label>
+          </>
+        )}
         <div className="quota" title={`ใช้ไป ${quota.used}/${DAILY_LIMIT} units รีเซ็ตเที่ยงคืน Pacific (search=100 trending=1 playlist=1/หน้า ไม่นับ cache hit)`}>
           quota เหลือ ~{quota.remaining}/{DAILY_LIMIT}
         </div>
       </div>
 
-      {history.length > 0 && (
-        <>
-          <div className="section">
-            ประวัติ <button className="clear" onClick={clear}>ล้าง</button>
-          </div>
-          <div className="history">
-            {history.map((v) => (
-              <button key={v.id} onClick={() => play(v)}>{v.title.slice(0, 30)}…</button>
-            ))}
-          </div>
-        </>
-      )}
-
-      <div className="section">
-        เพลย์ลิสต์
-        <span className="prow">
-          <button className="clear" onClick={() => { const p = create(`เพลย์ลิสต์ ${playlists.length + 1}`); setActiveId(p.id) }}>+ สร้าง</button>
-          <button className="clear" onClick={doExport} disabled={playlists.length === 0}>⤓ export</button>
-          <button className="clear" onClick={() => fileRef.current?.click()}>⤒ import ไฟล์</button>
-          <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => { void doImportFile(e.target.files?.[0]); e.target.value = '' }} />
-        </span>
-      </div>
-      <div className="plist">
-        {playlists.map((p) => (
-          <button key={p.id} className={p.id === activeId ? 'on' : ''} onClick={() => setActiveId(p.id === activeId ? null : p.id)}>
-            {p.name} ({p.items.length}){p.source === 'youtube' ? ' ▶' : ''}
-          </button>
-        ))}
-        {playlists.length === 0 && <span className="muted">ยังไม่มี — กด + สร้าง หรือวางลิงก์ YouTube ด้านล่าง</span>}
-      </div>
-      <div className="prow import">
-        <input value={importUrl} onChange={(e) => setImportUrl(e.target.value)} placeholder="วางลิงก์ playlist YouTube… (…?list=XXXX)" aria-label="ลิงก์เพลย์ลิสต์" />
-        <button onClick={() => { void doImport() }} disabled={importing || !importUrl.trim()}>{importing ? 'กำลังดึง…' : 'ดึงจาก YouTube'}</button>
-        {active && <button className="clear" onClick={() => remove(active.id)}>ลบ “{active.name}”</button>}
-      </div>
-      {importMsg && <div className="loading">{importMsg}</div>}
-      {active && active.items.length > 0 && (
-        <div className="history queue">
-          {active.items.map((v, i) => (
-            <span key={v.id} className="qitem">
-              <button onClick={() => playQueue(active.items, i)}>{i + 1}. {v.title.slice(0, 28)}…</button>
-              <button className="clear" onClick={() => removeItem(active.id, v.id)} title="ลบออก">✕</button>
-            </span>
-          ))}
-        </div>
-      )}
+      {notice && <div className="notice">{notice}</div>}
 
       {current && (
         <Player
@@ -231,17 +216,97 @@ export default function App() {
         />
       )}
 
-      {error && <div className="error">{error}</div>}
-      {loading && <div className="loading">กำลังค้นหา…</div>}
+      {menu === 'home' && (
+        <>
+          {history.length > 0 && (
+            <>
+              <div className="section">
+                ประวัติ <button className="clear" onClick={clear}>ล้าง</button>
+              </div>
+              <div className="history">
+                {history.map((v) => (
+                  <button key={v.id} onClick={() => play(v)}>{v.title.slice(0, 30)}…</button>
+                ))}
+              </div>
+            </>
+          )}
 
-      <div className="section">{searched ? (liveOnly ? 'ผลการค้นหา 🔴 ไลฟ์สด' : 'ผลการค้นหา') : '🔥 Trending ไทย'}</div>
-      <div className="grid">
-        {list.map((v) => (
-          <VideoCard key={v.id} v={v} onPlay={play} onAdd={handleAdd} />
-        ))}
-      </div>
-      {!loading && searched && videos.length === 0 && !error && (
-        <div className="loading">ไม่พบผลลัพธ์</div>
+          {error && <div className="error">{error}</div>}
+          {loading && <div className="loading">กำลังค้นหา…</div>}
+
+          <div className="section">{searched ? (liveOnly ? 'ผลการค้นหา 🔴 ไลฟ์สด' : 'ผลการค้นหา') : '🔥 Trending ไทย'}</div>
+          <div className="grid">
+            {list.map((v) => (
+              <VideoCard key={v.id} v={v} onPlay={play} onAdd={setPicker} />
+            ))}
+          </div>
+          {!loading && searched && videos.length === 0 && !error && (
+            <div className="loading">ไม่พบผลลัพธ์</div>
+          )}
+        </>
+      )}
+
+      {menu === 'playlists' && !active && (
+        <>
+          <div className="section">🎵 เพลย์ลิสต์ทั้งหมด</div>
+          <div className="prow import">
+            <input value={importUrl} onChange={(e) => setImportUrl(e.target.value)} placeholder="วางลิงก์ playlist YouTube… (…?list=XXXX)" aria-label="ลิงก์เพลย์ลิสต์" />
+            <button onClick={() => { void doImport() }} disabled={importing || !importUrl.trim()}>{importing ? 'กำลังดึง…' : 'ดึงจาก YouTube'}</button>
+            <button className="clear" onClick={doExport} disabled={playlists.length === 0}>⤓ export</button>
+            <button className="clear" onClick={() => fileRef.current?.click()}>⤒ import ไฟล์</button>
+            <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => { void doImportFile(e.target.files?.[0]); e.target.value = '' }} />
+          </div>
+          {importMsg && <div className="loading">{importMsg}</div>}
+          <div className="plistcards">
+            <button className="pcard new" onClick={() => { const p = create(`เพลย์ลิสต์ ${playlists.length + 1}`); openDetail(p.id) }}>
+              <div className="noart">＋</div>
+              <div className="pname">+ สร้างใหม่</div>
+            </button>
+            {playlists.map((p) => (
+              <button key={p.id} className="pcard" onClick={() => openDetail(p.id)}>
+                {p.items[0] ? <img src={p.items[0].thumb} alt="" loading="lazy" /> : <div className="noart">🎵</div>}
+                <div className="pname">{p.name}</div>
+                <div className="muted">{p.items.length} เพลง{p.source === 'youtube' ? ' • YT' : ''}</div>
+              </button>
+            ))}
+          </div>
+          {playlists.length === 0 && <div className="loading">ยังไม่มี — สร้างใหม่หรือวางลิงก์ YouTube ด้านบนได้เลย</div>}
+        </>
+      )}
+
+      {menu === 'playlists' && active && (
+        <>
+          <div className="section">
+            <button className="clear" onClick={() => setActiveId(null)}>‹ กลับ</button>
+            {' '}🎵 {active.name} ({active.items.length})
+          </div>
+          <div className="prow rename">
+            <input value={renameVal} onChange={(e) => setRenameVal(e.target.value)} placeholder="ชื่อเพลย์ลิสต์…" aria-label="ชื่อเพลย์ลิสต์" />
+            <button onClick={() => { rename(active.id, renameVal) }} disabled={!renameVal.trim() || renameVal.trim() === active.name}>บันทึกชื่อ</button>
+            <button className="clear" onClick={() => { if (active.items.length > 0) playQueue(active.items, Math.floor(Math.random() * active.items.length)) }} disabled={active.items.length === 0}>🔀 สุ่มเล่น</button>
+            <button className="clear" onClick={() => { if (active.items.length > 0) playQueue(active.items, 0) }} disabled={active.items.length === 0}>▶ เล่นทั้งหมด</button>
+            <button className="clear danger" onClick={() => { remove(active.id); setActiveId(null) }}>ลบเพลย์ลิสต์</button>
+          </div>
+          <div className="grid">
+            {active.items.map((v, i) => (
+              <div key={v.id} className="qwrap">
+                <VideoCard v={v} onPlay={(vv) => playQueue(active.items, active.items.findIndex((x) => x.id === vv.id))} onAdd={setPicker} />
+                <button className="clear" onClick={() => removeItem(active.id, v.id)} title="ลบออกจากเพลย์ลิสต์">ลบออก ({i + 1})</button>
+              </div>
+            ))}
+          </div>
+          {active.items.length === 0 && <div className="loading">ยังไม่มีเพลง — กลับหน้าแรกกด + ที่การ์ดเพื่อเพิ่มได้เลย</div>}
+        </>
+      )}
+
+      {picker && (
+        <PlaylistPicker
+          video={picker}
+          playlists={playlists}
+          onPick={pickAdd}
+          onCreate={pickCreate}
+          onClose={() => setPicker(null)}
+        />
       )}
     </div>
   )

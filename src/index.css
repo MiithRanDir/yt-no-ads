@@ -30,6 +30,29 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .livebadge { position: absolute; left: 8px; bottom: 8px; background: #c00; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: .3px; }
 .livecheck { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #ccc; cursor: pointer; white-space: nowrap; user-select: none; }
 .livecheck input { width: 16px; height: 16px; accent-color: #c00; cursor: pointer; }
+.tabs { display: flex; gap: 4px; background: #212121; border-radius: 18px; padding: 3px; }
+.tabs button { border: 0; background: transparent; color: #ccc; padding: 7px 14px; border-radius: 15px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+.tabs button.on { background: #fff; color: #000; font-weight: 700; }
+.notice { background: #14331f; color: #9df0b4; padding: 10px 14px; border-radius: 8px; margin: 0 0 12px; }
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+.sheet { background: #1c1c1c; border: 1px solid #333; border-radius: 14px; padding: 18px; width: 100%; max-width: 420px; max-height: 80vh; overflow: auto; }
+.sheet-title { font-weight: 800; font-size: 16px; margin-bottom: 4px; }
+.sheet-sub { font-size: 13px; color: #aaa; margin-bottom: 12px; }
+.picklist { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.pickrow { display: flex; justify-content: space-between; gap: 8px; background: #272727; color: #fff; border: 0; padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 14px; text-align: left; }
+.pickrow:disabled { opacity: .55; cursor: default; }
+.pickrow:not(:disabled):hover { background: #333; }
+.plistcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.pcard { background: #1c1c1c; border: 1px solid #2c2c2c; border-radius: 12px; padding: 0 0 10px; cursor: pointer; color: inherit; text-align: left; overflow: hidden; }
+.pcard img, .pcard .noart { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #2a2a2a; display: flex; align-items: center; justify-content: center; font-size: 32px; }
+.pcard .pname { font-weight: 700; font-size: 14px; margin: 8px 10px 2px; }
+.pcard .muted { margin: 0 10px; }
+.pcard.new { border-style: dashed; }
+.prow.rename { display: flex; margin: 8px 0 12px; flex-wrap: wrap; gap: 8px; align-items: center; }
+.prow.rename input { flex: 1; min-width: 160px; padding: 8px 12px; border-radius: 16px; border: 1px solid #333; background: #212121; color: #fff; font-size: 13px; }
+.prow.rename button { padding: 8px 14px; border-radius: 16px; border: 0; background: #fff; cursor: pointer; font-weight: 600; white-space: nowrap; }
+.clear.danger { color: #ff9a9a; }
+.qwrap { display: flex; flex-direction: column; gap: 2px; }
 .plist { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .plist button { background: #272727; color: #fff; border: 0; padding: 6px 12px; border-radius: 14px; cursor: pointer; font-size: 13px; }
 .plist button.on { background: #fff; color: #000; font-weight: 700; }

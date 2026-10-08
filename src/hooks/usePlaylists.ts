@@ -20,6 +20,12 @@ export function usePlaylists() {
     persist(playlists.filter((p) => p.id !== id))
   }
 
+  function rename(id: string, name: string) {
+    const n = name.trim()
+    if (!n) return
+    persist(playlists.map((p) => (p.id === id ? { ...p, name: n, updatedAt: Date.now() } : p)))
+  }
+
   function addItem(pid: string, video: VideoItem) {
     persist(playlists.map((p) => (p.id === pid && !p.items.some((x) => x.id === video.id)
       ? { ...p, items: [...p.items, video].slice(0, MAX_ITEMS), updatedAt: Date.now() }
@@ -52,5 +58,5 @@ export function usePlaylists() {
     return pls
   }
 
-  return { playlists, create, remove, addItem, removeItem, importItems, replaceAll, exportAll, importAll }
+  return { playlists, create, remove, rename, addItem, removeItem, importItems, replaceAll, exportAll, importAll }
 }
