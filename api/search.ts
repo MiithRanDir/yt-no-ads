@@ -14,7 +14,7 @@ export default async function handler(req: any, res: any) {
     res.status(405).json({ error: 'method not allowed' })
     return
   }
-  const { q = '', type = '', listId = '' } = req.query ?? {}
+  const { q = '', type = '', listId = '', live = '' } = req.query ?? {}
 
   if (type === 'playlist') {
     if (!/^[A-Za-z0-9_-]+$/.test(String(listId))) {
@@ -51,10 +51,12 @@ export default async function handler(req: any, res: any) {
     return
   }
   const base = 'https://www.googleapis.com/youtube/v3'
+  // ponytail: live=1 ส่ง eventType=live (ต้องมากับ type=video อยู่แล้ว) cost เท่าเดิม 100
+  const liveQs = live === '1' ? '&eventType=live' : ''
   const url =
     type === 'trending'
       ? `${base}/videos?part=snippet,status&chart=mostPopular&regionCode=TH&maxResults=24&key=${key}`
-      : `${base}/search?part=snippet&type=video&maxResults=24&q=${encodeURIComponent(String(q))}&key=${key}`
+      : `${base}/search?part=snippet&type=video&maxResults=24&q=${encodeURIComponent(String(q))}${liveQs}&key=${key}`
 
   const r = await fetch(url)
   const body = await r.json()

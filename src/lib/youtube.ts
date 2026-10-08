@@ -5,6 +5,7 @@ export interface VideoItem {
   title: string
   channel: string
   thumb: string
+  live?: boolean // ponytail: ไลฟ์สดไหม (จาก liveBroadcastContent) — ไว้อวด badge + filter
 }
 
 const SEARCH_TTL = 30 * 60 * 1000 // 30 นาที — search เปลี่ยนบ่อยแต่กันพิมพ์ซ้ำเผา quota
@@ -69,11 +70,13 @@ function mapSearch(json: unknown): VideoItem[] {
       }
       const id = typeof v.id === 'string' ? v.id : v.id?.videoId ?? ''
       if (!id) return null
+      const live = (v as { snippet?: { liveBroadcastContent?: string } }).snippet?.liveBroadcastContent === 'live'
       return {
         id,
         title: v.snippet?.title ?? id,
         channel: v.snippet?.channelTitle ?? '',
         thumb: v.snippet?.thumbnails?.medium?.url ?? `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+        ...(live ? { live: true as const } : {}),
       } as VideoItem
     })
     .filter(Boolean) as VideoItem[]
@@ -90,11 +93,13 @@ function mapVideos(json: unknown): VideoItem[] {
       }
       if (!v.id) return null
       if (v.status && v.status.embeddable === false) return null // filter embeddable
+      const live = (v as { snippet?: { liveBroadcastContent?: string } }).snippet?.liveBroadcastContent === 'live'
       return {
         id: v.id,
         title: v.snippet?.title ?? v.id,
         channel: v.snippet?.channelTitle ?? '',
         thumb: v.snippet?.thumbnails?.medium?.url ?? `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`,
+        ...(live ? { live: true as const } : {}),
       } as VideoItem
     })
     .filter(Boolean) as VideoItem[]
@@ -113,16 +118,17 @@ async function fetchJson(url: string): Promise<unknown> {
 
 const DIRECT = 'https://www.googleapis.com/youtube/v3'
 
-export async function searchVideos(q: string): Promise<VideoItem[]> {
+export async function searchVideos(q: string, opts?: { liveOnly?: boolean }): Promise<VideoItem[]> {
   const query = q.trim()
   if (!query) return []
-  const key = `s:${query}`
+  const liveOnly = opts?.liveOnly ?? false
+  const key = liveOnly ? `s:live:${query}` : `s:${query}` // ponytail: แยก cache ไลฟ์/ปกติ กันปนกัน
   const hit = getCache(key)
   if (hit) return hit
 
   // 1) ลองผ่าน proxy ก่อน (prod บน Vercel ซ่อน key)
   try {
-    const r = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+    const r = await fetch(`/api/search?q=${encodeURIComponent(query)}${liveOnly ? '&live=1' : ''}`)
     if (r.ok) {
       const data = mapSearch(await r.json())
       setCache(key, data)
@@ -136,7 +142,7 @@ export async function searchVideos(q: string): Promise<VideoItem[]> {
   // 2) fallback ตรง (dev local ใช้ VITE_YT_API_KEY)
   const apiKey = (import.meta.env.VITE_YT_API_KEY as string | undefined) ?? ''
   if (!apiKey) throw new Error('ยังไม่ได้ตั้งค่า API key — ดู .env.example (VITE_YT_API_KEY) หรือตั้ง YT_API_KEY บน Vercel')
-  const url = `${DIRECT}/search?part=snippet&type=video&maxResults=24&q=${encodeURIComponent(query)}&key=${apiKey}`
+  const url = `${DIRECT}/search?part=snippet&type=video&maxResults=24&q=${encodeURIComponent(query)}${liveOnly ? '&eventType=live' : ''}&key=${apiKey}`
   const data = mapSearch(await fetchJson(url))
   setCache(key, data)
   addQuota(COST_SEARCH)

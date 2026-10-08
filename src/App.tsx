@@ -15,6 +15,8 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
+  const [liveOnly, setLiveOnly] = useState(false)
+  const lastQ = useRef('')
   const [quotaTick, setQuotaTick] = useState(0)
   // ponytail: อ่าน quota ใหม่ทุก render ที่ tick เปลี่ยน ไม่ต้อง subscribe
   const quota = getQuota()
@@ -34,13 +36,13 @@ export default function App() {
     getTrending().then((t) => { setTrending(t); setQuotaTick((n) => n + 1) }).catch(() => {})
   }, [])
 
-  const doSearch = useCallback(async (q: string) => {
+  const doSearch = useCallback(async (q: string, live?: boolean) => {
     if (!q.trim()) return
     setLoading(true)
     setError('')
     setSearched(true)
     try {
-      setVideos(await searchVideos(q))
+      setVideos(await searchVideos(q, { liveOnly: live ?? liveOnly }))
       setQuotaTick((n) => n + 1)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ค้นหาไม่สำเร็จ')
@@ -159,7 +161,11 @@ export default function App() {
         <div className="logo">
           <span>▶</span> YT No Ads
         </div>
-        <SearchBar onSearch={(q) => { void doSearch(q) }} onType={(q) => { if (q.trim().length >= 3) debounced(q) }} />
+        <SearchBar onSearch={(q) => { lastQ.current = q; void doSearch(q) }} onType={(q) => { lastQ.current = q; if (q.trim().length >= 3) debounced(q) }} />
+        <label className="livecheck" title="ติ๊กแล้วค้นหาเฉพาะวิดีโอที่กำลังไลฟ์สด (eventType=live, cost เท่าเดิม 100 units)">
+          <input type="checkbox" checked={liveOnly} onChange={(e) => { const v = e.target.checked; setLiveOnly(v); if (searched && lastQ.current.trim()) void doSearch(lastQ.current, v) }} />
+          🔴 ไลฟ์สดอย่างเดียว
+        </label>
         <div className="quota" title={`ใช้ไป ${quota.used}/${DAILY_LIMIT} units รีเซ็ตเที่ยงคืน Pacific (search=100 trending=1 playlist=1/หน้า ไม่นับ cache hit)`}>
           quota เหลือ ~{quota.remaining}/{DAILY_LIMIT}
         </div>
@@ -228,7 +234,7 @@ export default function App() {
       {error && <div className="error">{error}</div>}
       {loading && <div className="loading">กำลังค้นหา…</div>}
 
-      <div className="section">{searched ? 'ผลการค้นหา' : '🔥 Trending ไทย'}</div>
+      <div className="section">{searched ? (liveOnly ? 'ผลการค้นหา 🔴 ไลฟ์สด' : 'ผลการค้นหา') : '🔥 Trending ไทย'}</div>
       <div className="grid">
         {list.map((v) => (
           <VideoCard key={v.id} v={v} onPlay={play} onAdd={handleAdd} />
