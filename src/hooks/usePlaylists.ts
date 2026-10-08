@@ -5,47 +5,52 @@ import { dedupe, loadPlaylists, savePlaylists, exportJSON, importJSON, uid, MAX_
 export function usePlaylists() {
   const [playlists, setPlaylists] = useState<Playlist[]>(loadPlaylists)
 
-  function persist(next: Playlist[]) {
-    savePlaylists(next)
-    setPlaylists(next)
+  // ponytail: functional update ทุกตัว — create ต่อด้วย addItem/importItems ใน tick เดียวกัน
+  // ถ้าใช้ playlists จาก closure ตัวหลังจะเขียนทับตัวแรก (playlist หาย)
+  function update(fn: (prev: Playlist[]) => Playlist[]) {
+    setPlaylists((prev) => {
+      const next = fn(prev)
+      savePlaylists(next)
+      return next
+    })
   }
 
   function create(name: string, source: Playlist['source'] = 'manual'): Playlist {
     const p: Playlist = { id: uid(), name: name.trim() || 'เพลย์ลิสต์', items: [], createdAt: Date.now(), updatedAt: Date.now(), source }
-    persist([p, ...playlists])
+    update((prev) => [p, ...prev])
     return p
   }
 
   function remove(id: string) {
-    persist(playlists.filter((p) => p.id !== id))
+    update((prev) => prev.filter((p) => p.id !== id))
   }
 
   function rename(id: string, name: string) {
     const n = name.trim()
     if (!n) return
-    persist(playlists.map((p) => (p.id === id ? { ...p, name: n, updatedAt: Date.now() } : p)))
+    update((prev) => prev.map((p) => (p.id === id ? { ...p, name: n, updatedAt: Date.now() } : p)))
   }
 
   function addItem(pid: string, video: VideoItem) {
-    persist(playlists.map((p) => (p.id === pid && !p.items.some((x) => x.id === video.id)
+    update((prev) => prev.map((p) => (p.id === pid && !p.items.some((x) => x.id === video.id)
       ? { ...p, items: [...p.items, video].slice(0, MAX_ITEMS), updatedAt: Date.now() }
       : p)))
   }
 
   function removeItem(pid: string, videoId: string) {
-    persist(playlists.map((p) => (p.id === pid
+    update((prev) => prev.map((p) => (p.id === pid
       ? { ...p, items: p.items.filter((x) => x.id !== videoId), updatedAt: Date.now() }
       : p)))
   }
 
   function importItems(pid: string, videos: VideoItem[]) {
-    persist(playlists.map((p) => (p.id === pid
+    update((prev) => prev.map((p) => (p.id === pid
       ? { ...p, items: dedupe([...p.items, ...videos]).slice(0, MAX_ITEMS), updatedAt: Date.now() }
       : p)))
   }
 
   function replaceAll(pls: Playlist[]) {
-    persist(pls)
+    update(() => pls)
   }
 
   function exportAll(): string {
@@ -54,7 +59,7 @@ export function usePlaylists() {
 
   function importAll(raw: string): Playlist[] {
     const pls = importJSON(raw)
-    persist(pls)
+    update(() => pls)
     return pls
   }
 
