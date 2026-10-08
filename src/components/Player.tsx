@@ -72,7 +72,14 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
           host: 'https://www.youtube-nocookie.com',
           videoId: idRef.current,
           playerVars: { autoplay: 1, rel: 0 },
-          events: { onStateChange: (e: { data: number }) => { if (e.data === 0) endedRef.current?.() } },
+          events: {
+            onStateChange: (e: { data: number }) => { if (e.data === 0) endedRef.current?.() },
+            // ponytail: คลิป unavailable/ห้าม embed ยิง error (ไม่ใช่ ENDED) → รอ 1.5s แล้วข้ามเพลงถ้ายังอยู่ที่เดิม
+            onError: () => {
+              const bad = idRef.current
+              window.setTimeout(() => { if (idRef.current === bad) endedRef.current?.() }, 1500)
+            },
+          },
         })
       } else {
         const f = document.createElement('iframe')
