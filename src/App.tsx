@@ -7,7 +7,8 @@ import { useHistory } from './hooks/useHistory'
 import { usePlaylists } from './hooks/usePlaylists'
 import { debounce, fetchPlaylistItems, getTrending, searchVideos, type VideoItem } from './lib/youtube'
 import { COST_PLAYLIST, getQuota, DAILY_LIMIT } from './lib/quota'
-import { parseYoutubeListId } from './lib/playlists'
+import { parseYoutubeListId, exportJSON as playlistsToJSON } from './lib/playlists'
+import { clearSync, ensureGist, getGistId, getToken, pullPlaylists, pushPlaylists, saveToken } from './lib/gist'
 
 type Menu = 'home' | 'playlists'
 
@@ -25,7 +26,7 @@ export default function App() {
   const quota = getQuota()
   void quotaTick
   const { history, push, clear } = useHistory()
-  const { playlists, create, remove, rename, addItem, removeItem, importItems, exportAll, importAll } = usePlaylists()
+  const { playlists, create, remove, rename, addItem, removeItem, importItems, replaceAll, exportAll, importAll } = usePlaylists()
   const [menu, setMenu] = useState<Menu>('home')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [queue, setQueue] = useState<VideoItem[]>([])
@@ -36,6 +37,71 @@ export default function App() {
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const [renameVal, setRenameVal] = useState('')
+  // ponytail: gist sync — token ต่อ browser, lastSynced กัน loop push หลัง pull
+  const [gistToken, setGistToken] = useState<string | null>(() => getToken())
+  const [tokenInput, setTokenInput] = useState('')
+  const [gistStatus, setGistStatus] = useState('')
+  const [gistBusy, setGistBusy] = useState(false)
+  const lastSynced = useRef<string | null>(null)
+  const pushTimer = useRef<number | null>(null)
+  function stamp(): string {
+    return new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  async function gistPull(token: string, silent = false) {
+    setGistBusy(true)
+    if (!silent) setGistStatus('กำลังดึงจาก Gist…')
+    try {
+      const id = await ensureGist(token)
+      const remote = await pullPlaylists(token, id)
+      const remoteJson = playlistsToJSON(remote)
+      lastSynced.current = remoteJson
+      const localJson = playlistsToJSON(playlists)
+      if (remote.length === 0 && playlists.length > 0) {
+        // gist ว่าง (เพิ่งสร้างครั้งแรก) → อัปโหลดของเครื่องนี้ขึ้นไป ห้ามล้างเครื่อง
+        await pushPlaylists(token, id, playlists)
+        lastSynced.current = localJson
+        setGistStatus(`อัปโหลดของเครื่องนี้ขึ้น Gist แล้ว ${stamp()}`)
+      } else if (remoteJson !== localJson) {
+        replaceAll(remote)
+        const first = remote[0]
+        if (first && !playlists.some((p) => p.id === activeId)) { setActiveId(first.id); setRenameVal(first.name) }
+        setGistStatus(`ดึงล่าสุดแล้ว ${stamp()} (${remote.length} ลิสต์)`)
+      } else {
+        setGistStatus(`ตรงกันแล้ว ${stamp()}`)
+      }
+    } catch (e) {
+      setGistStatus(e instanceof Error ? e.message : 'ซิงค์ไม่สำเร็จ')
+    } finally {
+      setGistBusy(false)
+    }
+  }
+
+  // เปิดแอป: ถ้าเคยเชื่อมไว้ ดึงล่าสุดอัตโนมัติ
+  useEffect(() => {
+    const t = getToken()
+    if (t) void gistPull(t, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // แก้ playlist: รอ 4 วิแล้วอัปโหลดขึ้น gist (ข้ามถ้าเพิ่ง pull มา)
+  useEffect(() => {
+    if (!gistToken || !getGistId()) return
+    const cur = playlistsToJSON(playlists)
+    if (cur === lastSynced.current) return
+    if (pushTimer.current) window.clearTimeout(pushTimer.current)
+    pushTimer.current = window.setTimeout(() => {
+      const id = getGistId()
+      const token = getToken()
+      if (!id || !token) return
+      pushPlaylists(token, id, playlists)
+        .then(() => { lastSynced.current = playlistsToJSON(playlists); setGistStatus(`อัปโหลดแล้ว ${stamp()}`) })
+        .catch((e: unknown) => setGistStatus(e instanceof Error ? e.message : 'อัปโหลดไม่สำเร็จ'))
+    }, 4000)
+    return () => { if (pushTimer.current) window.clearTimeout(pushTimer.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playlists, gistToken])
+
   const fileRef = useRef<HTMLInputElement>(null)
   const active = playlists.find((p) => p.id === activeId) ?? null
 
@@ -249,6 +315,38 @@ export default function App() {
       {menu === 'playlists' && !active && (
         <>
           <div className="section">🎵 เพลย์ลิสต์ทั้งหมด</div>
+          <div className="syncbox">
+            {!gistToken ? (
+              <>
+                <div className="prow import" style={{ margin: 0 }}>
+                  <input
+                    type="password"
+                    value={tokenInput}
+                    onChange={(e) => setTokenInput(e.target.value)}
+                    placeholder="วาง GitHub token (สิทธิ์ gist)…"
+                    aria-label="GitHub token สำหรับซิงค์"
+                  />
+                  <button
+                    disabled={gistBusy || !tokenInput.trim()}
+                    onClick={() => { saveToken(tokenInput); setGistToken(tokenInput.trim()); setTokenInput(''); void gistPull(tokenInput.trim()) }}
+                  >
+                    เชื่อม Gist
+                  </button>
+                </div>
+                <div className="muted">ซิงค์ข้าม browser อัตโนมัติผ่าน private gist — สร้าง token ที่ github.com/settings/tokens (ติ๊ก gist) แปะครั้งเดียวต่อเครื่อง</div>
+              </>
+            ) : (
+              <>
+                <div className="prow import" style={{ margin: 0 }}>
+                  <button disabled={gistBusy} onClick={() => { const t = getToken(); if (t) void gistPull(t) }}>
+                    {gistBusy ? 'กำลังซิงค์…' : '⬇ ซิงค์ตอนนี้'}
+                  </button>
+                  <button className="clear" onClick={() => { clearSync(); setGistToken(null); setGistStatus(''); lastSynced.current = null }}>ยกเลิกเชื่อม</button>
+                </div>
+                {gistStatus && <div className="muted">☁ {gistStatus}</div>}
+              </>
+            )}
+          </div>
           <div className="prow import">
             <input value={importUrl} onChange={(e) => setImportUrl(e.target.value)} placeholder="วางลิงก์ playlist YouTube… (…?list=XXXX)" aria-label="ลิงก์เพลย์ลิสต์" />
             <button onClick={() => { void doImport() }} disabled={importing || !importUrl.trim()}>{importing ? 'กำลังดึง…' : 'ดึงจาก YouTube'}</button>

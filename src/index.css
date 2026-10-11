@@ -53,6 +53,8 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .prow.rename button { padding: 8px 14px; border-radius: 16px; border: 0; background: #fff; cursor: pointer; font-weight: 600; white-space: nowrap; }
 .clear.danger { color: #ff9a9a; }
 .qwrap { display: flex; flex-direction: column; gap: 2px; }
+.syncbox { background: #1c1c1c; border: 1px solid #2c2c2c; border-radius: 12px; padding: 12px; margin: 0 0 12px; }
+.syncbox .muted { margin-top: 8px; display: block; }
 .plist { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .plist button { background: #272727; color: #fff; border: 0; padding: 6px 12px; border-radius: 14px; cursor: pointer; font-size: 13px; }
 .plist button.on { background: #fff; color: #000; font-weight: 700; }
