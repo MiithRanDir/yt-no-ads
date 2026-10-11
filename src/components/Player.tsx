@@ -121,8 +121,8 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
       <div className="row">
         {(onPrev || onNext || onShuffle) && (
           <>
-            <button className="close" onClick={onPrev} disabled={!hasPrev} title="ก่อนหน้า">‹</button>
-            <button className="close" onClick={onNext} disabled={!hasNext} title="ถัดไป">›</button>
+            <button className="close" onClick={onPrev} disabled={!hasPrev} title="ก่อนหน้า (Shift+P)">‹</button>
+            <button className="close" onClick={onNext} disabled={!hasNext} title="ถัดไป (Shift+N)">›</button>
             <button className="close" onClick={onShuffle} title="สุ่ม">🔀</button>
           </>
         )}
