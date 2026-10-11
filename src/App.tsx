@@ -8,7 +8,7 @@ import { usePlaylists } from './hooks/usePlaylists'
 import { debounce, fetchPlaylistItems, getTrending, searchVideos, type VideoItem } from './lib/youtube'
 import { COST_PLAYLIST, getQuota, DAILY_LIMIT } from './lib/quota'
 import { parseYoutubeListId, exportJSON as playlistsToJSON } from './lib/playlists'
-import { clearSync, ensureGist, getGistId, getToken, pullPlaylists, pushPlaylists, saveToken } from './lib/gist'
+import { syncLogin, syncLogout, syncPull, syncPush } from './lib/sync'
 
 type Menu = 'home' | 'playlists'
 
@@ -37,70 +37,89 @@ export default function App() {
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState('')
   const [renameVal, setRenameVal] = useState('')
-  // ponytail: gist sync — token ต่อ browser, lastSynced กัน loop push หลัง pull
-  const [gistToken, setGistToken] = useState<string | null>(() => getToken())
-  const [tokenInput, setTokenInput] = useState('')
-  const [gistStatus, setGistStatus] = useState('')
-  const [gistBusy, setGistBusy] = useState(false)
+  // ponytail: server sync — รหัสสั้นครั้งเดียวได้ cookie 1 ปี, lastSynced กัน loop push หลัง pull
+  const [needLogin, setNeedLogin] = useState(true) // เริ่มจากล็อกก่อน พิสูจน์ cookie ผ่านค่อยเปิด
+  const [pw, setPw] = useState('')
+  const [syncStatus, setSyncStatus] = useState('')
+  const [syncBusy, setSyncBusy] = useState(false)
   const lastSynced = useRef<string | null>(null)
   const pushTimer = useRef<number | null>(null)
   function stamp(): string {
     return new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
   }
 
-  async function gistPull(token: string, silent = false) {
-    setGistBusy(true)
-    if (!silent) setGistStatus('กำลังดึงจาก Gist…')
+  async function doSyncPull(silent = false) {
+    setSyncBusy(true)
+    if (!silent) setSyncStatus('กำลังดึงข้อมูล…')
     try {
-      const id = await ensureGist(token)
-      const remote = await pullPlaylists(token, id)
+      const remote = await syncPull()
       const remoteJson = playlistsToJSON(remote)
       lastSynced.current = remoteJson
       const localJson = playlistsToJSON(playlists)
       if (remote.length === 0 && playlists.length > 0) {
-        // gist ว่าง (เพิ่งสร้างครั้งแรก) → อัปโหลดของเครื่องนี้ขึ้นไป ห้ามล้างเครื่อง
-        await pushPlaylists(token, id, playlists)
+        // ไฟล์กลางว่าง → อัปโหลดของเครื่องนี้ขึ้นไป ห้ามล้างเครื่อง
+        await syncPush(playlists)
         lastSynced.current = localJson
-        setGistStatus(`อัปโหลดของเครื่องนี้ขึ้น Gist แล้ว ${stamp()}`)
+        setSyncStatus(`อัปโหลดของเครื่องนี้แล้ว ${stamp()}`)
       } else if (remoteJson !== localJson) {
         replaceAll(remote)
         const first = remote[0]
         if (first && !playlists.some((p) => p.id === activeId)) { setActiveId(first.id); setRenameVal(first.name) }
-        setGistStatus(`ดึงล่าสุดแล้ว ${stamp()} (${remote.length} ลิสต์)`)
+        setSyncStatus(`ดึงล่าสุดแล้ว ${stamp()} (${remote.length} ลิสต์)`)
       } else {
-        setGistStatus(`ตรงกันแล้ว ${stamp()}`)
+        setSyncStatus(`ตรงกันแล้ว ${stamp()}`)
       }
+      setNeedLogin(false)
     } catch (e) {
-      setGistStatus(e instanceof Error ? e.message : 'ซิงค์ไม่สำเร็จ')
+      if (e instanceof Error && e.message === 'NEED_LOGIN') {
+        setNeedLogin(true)
+        setSyncStatus('ใส่รหัสครั้งเดียวเพื่อซิงค์ข้ามเครื่อง')
+      } else {
+        setSyncStatus(e instanceof Error ? e.message : 'ซิงค์ไม่สำเร็จ')
+      }
     } finally {
-      setGistBusy(false)
+      setSyncBusy(false)
     }
   }
 
-  // เปิดแอป: ถ้าเคยเชื่อมไว้ ดึงล่าสุดอัตโนมัติ
+  async function doLogin() {
+    if (!pw.trim()) return
+    setSyncBusy(true)
+    try {
+      await syncLogin(pw)
+      setPw('')
+      setNeedLogin(false)
+      await doSyncPull()
+    } catch (e) {
+      setSyncStatus(e instanceof Error ? e.message : 'เข้าสู่ระบบไม่สำเร็จ')
+    } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  // เปิดแอป: ลองดึงล่าสุดอัตโนมัติ (ยังไม่ login ก็ใช้ local ต่อได้)
   useEffect(() => {
-    const t = getToken()
-    if (t) void gistPull(t, true)
+    void doSyncPull(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // แก้ playlist: รอ 4 วิแล้วอัปโหลดขึ้น gist (ข้ามถ้าเพิ่ง pull มา)
+  // แก้ playlist: รอ 4 วิแล้วอัปโหลด (ข้ามถ้าเพิ่ง pull มา / ยังไม่ login ไม่ยิงซ้ำ)
   useEffect(() => {
-    if (!gistToken || !getGistId()) return
+    if (needLogin) return
     const cur = playlistsToJSON(playlists)
     if (cur === lastSynced.current) return
     if (pushTimer.current) window.clearTimeout(pushTimer.current)
     pushTimer.current = window.setTimeout(() => {
-      const id = getGistId()
-      const token = getToken()
-      if (!id || !token) return
-      pushPlaylists(token, id, playlists)
-        .then(() => { lastSynced.current = playlistsToJSON(playlists); setGistStatus(`อัปโหลดแล้ว ${stamp()}`) })
-        .catch((e: unknown) => setGistStatus(e instanceof Error ? e.message : 'อัปโหลดไม่สำเร็จ'))
+      syncPush(playlists)
+        .then(() => { lastSynced.current = playlistsToJSON(playlists); setSyncStatus(`อัปโหลดแล้ว ${stamp()}`) })
+        .catch((e: unknown) => {
+          if (e instanceof Error && e.message === 'NEED_LOGIN') setNeedLogin(true)
+          else setSyncStatus(e instanceof Error ? e.message : 'อัปโหลดไม่สำเร็จ')
+        })
     }, 4000)
     return () => { if (pushTimer.current) window.clearTimeout(pushTimer.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playlists, gistToken])
+  }, [playlists, needLogin])
 
   const fileRef = useRef<HTMLInputElement>(null)
   const active = playlists.find((p) => p.id === activeId) ?? null
@@ -316,34 +335,33 @@ export default function App() {
         <>
           <div className="section">🎵 เพลย์ลิสต์ทั้งหมด</div>
           <div className="syncbox">
-            {!gistToken ? (
+            {needLogin ? (
               <>
                 <div className="prow import" style={{ margin: 0 }}>
                   <input
                     type="password"
-                    value={tokenInput}
-                    onChange={(e) => setTokenInput(e.target.value)}
-                    placeholder="วาง GitHub token (สิทธิ์ gist)…"
-                    aria-label="GitHub token สำหรับซิงค์"
+                    inputMode="text"
+                    value={pw}
+                    onChange={(e) => setPw(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void doLogin() }}
+                    placeholder="รหัสซิงค์…"
+                    aria-label="รหัสซิงค์ข้ามเครื่อง"
                   />
-                  <button
-                    disabled={gistBusy || !tokenInput.trim()}
-                    onClick={() => { saveToken(tokenInput); setGistToken(tokenInput.trim()); setTokenInput(''); void gistPull(tokenInput.trim()) }}
-                  >
-                    เชื่อม Gist
+                  <button disabled={syncBusy || !pw.trim()} onClick={() => { void doLogin() }}>
+                    เข้าสู่ระบบ
                   </button>
                 </div>
-                <div className="muted">ซิงค์ข้าม browser อัตโนมัติผ่าน private gist — สร้าง token ที่ github.com/settings/tokens (ติ๊ก gist) แปะครั้งเดียวต่อเครื่อง</div>
+                <div className="muted">ใส่รหัสสั้นๆ ครั้งเดียว (ตั้งใน Vercel env APP_PASSWORD) จำยาว 1 ปี — ใช้ซิงค์ playlist ข้าม browser/TV</div>
               </>
             ) : (
               <>
                 <div className="prow import" style={{ margin: 0 }}>
-                  <button disabled={gistBusy} onClick={() => { const t = getToken(); if (t) void gistPull(t) }}>
-                    {gistBusy ? 'กำลังซิงค์…' : '⬇ ซิงค์ตอนนี้'}
+                  <button disabled={syncBusy} onClick={() => { void doSyncPull() }}>
+                    {syncBusy ? 'กำลังซิงค์…' : '⬇ ซิงค์ตอนนี้'}
                   </button>
-                  <button className="clear" onClick={() => { clearSync(); setGistToken(null); setGistStatus(''); lastSynced.current = null }}>ยกเลิกเชื่อม</button>
+                  <button className="clear" onClick={() => { void syncLogout().finally(() => { setNeedLogin(true); setSyncStatus(''); lastSynced.current = null }) }}>ออกจากระบบ</button>
                 </div>
-                {gistStatus && <div className="muted">☁ {gistStatus}</div>}
+                {syncStatus && <div className="muted">☁ {syncStatus}</div>}
               </>
             )}
           </div>
