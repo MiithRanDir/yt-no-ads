@@ -207,7 +207,7 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
     <div className="player-wrap" ref={wrapRef}>
       <div className="player" ref={boxRef} />
       {audioOnly && track && (
-        <div className="audiocard">
+        <div className="audiofull">
           <img src={track.thumb} alt="" loading="lazy" />
           <div className="atitle">{track.title}</div>
           <div className="aartist">{track.channel}</div>
@@ -215,13 +215,22 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
             <div className="pfill" style={{ width: `${prog.d ? (prog.t / prog.d) * 100 : 0}%` }} />
           </div>
           <div className="ptime"><span>{fmt(prog.t)}</span><span>{fmt(prog.d)}</span></div>
-          {ctl && (
-            <button className="bigplay" onClick={toggle} aria-label={playing ? 'หยุด' : 'เล่น'}>
-              {playing ? '⏸' : '▶'}
-            </button>
-          )}
+          <div className="arow">
+            {onShuffle && <button className="abtn" onClick={onShuffle} title="สุ่ม">🔀</button>}
+            {onPrev && <button className="abtn big" onClick={onPrev} disabled={!hasPrev} title="ก่อนหน้า (Shift+P)">‹</button>}
+            {ctl ? (
+              <button className="bigplay" onClick={toggle} aria-label={playing ? 'หยุด' : 'เล่น'}>
+                {playing ? '⏸' : '▶'}
+              </button>
+            ) : (
+              <div className="muted">กำลังโหลด…</div>
+            )}
+            {onNext && <button className="abtn big" onClick={onNext} disabled={!hasNext} title="ถัดไป (Shift+N)">›</button>}
+          </div>
+          <button className="aclose" onClick={onClose}>✕ ปิด</button>
         </div>
       )}
+      {!audioOnly && (
       <div className="row">
         {(onPrev || onNext || onShuffle) && (
           <>
@@ -237,6 +246,7 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
           ✕ ปิด
         </button>
       </div>
+      )}
     </div>
   )
 }
