@@ -114,7 +114,7 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
           videoId: idRef.current,
           playerVars: { autoplay: 1, rel: 0 },
           events: {
-            onReady: () => { if (audioRef.current) { try { playerRef.current?.setPlaybackQuality('small') } catch { /* ข้าม */ } } },
+            onReady: () => { if (audioRef.current) { try { playerRef.current?.setPlaybackQuality('tiny') } catch { /* ข้าม */ } } },
             onStateChange: (e: { data: number }) => { if (e.data === 0) endedRef.current?.() },
             // ponytail: คลิป unavailable/ห้าม embed ยิง error (ไม่ใช่ ENDED) → รอ 1.5s แล้วข้ามเพลงถ้ายังอยู่ที่เดิม
             onError: () => {
@@ -141,9 +141,9 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
     }
   }, [])
 
-  // โหมดเสียงอย่างเดียว: บังคับ 240p ประหยัดเครื่อง (กลับปกติใช้ auto)
+  // โหมดเสียงอย่างเดียว: บังคับ 144p ประหยัดเครื่อง (กลับปกติใช้ auto)
   useEffect(() => {
-    try { playerRef.current?.setPlaybackQuality(audioOnly ? 'small' : 'auto') } catch { /* ยังไม่พร้อม */ }
+    try { playerRef.current?.setPlaybackQuality(audioOnly ? 'tiny' : 'auto') } catch { /* ยังไม่พร้อม */ }
   }, [audioOnly, id])
   useEffect(() => {
     if (playerRef.current) playerRef.current.loadVideoById(id)

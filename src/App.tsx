@@ -298,7 +298,7 @@ export default function App() {
             <div className="controlsrow">
               <button
                 className={audioOnly ? 'audiotoggle on' : 'audiotoggle'}
-                title="โหมดเสียงอย่างเดียว (ย่อจอ+240p ประหยัดเครื่อง)"
+                title="โหมดเสียงอย่างเดียว (ซ่อนจอ+144p ประหยัดเครื่อง)"
                 onClick={() => { const v = !audioOnly; setAudioOnly(v); try { localStorage.setItem('yt-audio-mode', v ? '1' : '0') } catch { /* ข้าม */ } }}
               >
                 🎧 เสียงอย่างเดียว
