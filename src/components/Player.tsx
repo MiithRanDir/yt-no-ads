@@ -11,6 +11,7 @@ interface Props {
   hasPrev?: boolean
   track?: { title: string; channel: string; thumb: string }
   audioOnly?: boolean
+  onToggleCar?: () => void
 }
 
 // ponytail: IFrame API จับ event จบคลิป (ENDED=0) เพื่อ auto-next ไม่ใช้ timer
@@ -61,7 +62,7 @@ function plainSrc(id: string) {
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`
 }
 
-export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly }: Props) {
+export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly, onToggleCar }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<ApiPlayer | null>(null)
@@ -208,6 +209,7 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
       <div className="player" ref={boxRef} />
       {audioOnly && track && (
         <div className="audiofull">
+          <button className="carfab" onClick={onToggleCar} title="โหมดรถ — ขยาย/ย่อ">🚗</button>
           <img src={track.thumb} alt="" loading="lazy" />
           <div className="atitle">{track.title}</div>
           <div className="aartist">{track.channel}</div>

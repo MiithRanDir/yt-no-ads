@@ -70,6 +70,16 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .abtn:disabled { opacity: .35; }
 .audiofull .bigplay { width: 76px; height: 76px; font-size: 28px; }
 .aclose { margin-top: 10px; background: #272727; color: #fff; border: 0; padding: 10px 22px; border-radius: 18px; cursor: pointer; }
+.carfab { position: absolute; top: 14px; right: 14px; width: 52px; height: 52px; border-radius: 50%; border: 1px solid #333; background: #212121; font-size: 24px; cursor: pointer; }
+/* ponytail: โหมดรถ — ขยายตามจอด้วย vmin กดง่ายบนจอรถ */
+.carmode .audiofull img { max-width: min(680px, 92vw); }
+.carmode .audiofull .atitle { font-size: clamp(20px, 4.5vmin, 34px); max-width: 92vw; }
+.carmode .audiofull .aartist { font-size: clamp(15px, 3vmin, 22px); }
+.carmode .audiofull .pbar, .carmode .audiofull .ptime { max-width: min(680px, 92vw); }
+.carmode .pbar { height: 8px; }
+.carmode .abtn { width: clamp(64px, 12vmin, 96px); height: clamp(64px, 12vmin, 96px); font-size: clamp(28px, 5vmin, 44px); }
+.carmode .audiofull .bigplay { width: clamp(88px, 17vmin, 132px); height: clamp(88px, 17vmin, 132px); font-size: clamp(32px, 7vmin, 52px); }
+.carmode .aclose { padding: 14px 30px; font-size: 17px; }
 .pbar { width: 100%; max-width: 300px; height: 4px; background: #333; border-radius: 2px; cursor: pointer; }
 .pfill { height: 100%; background: #ff0033; border-radius: 2px; }
 .ptime { width: 100%; max-width: 300px; display: flex; justify-content: space-between; font-size: 11px; color: #aaa; }

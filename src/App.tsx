@@ -23,6 +23,11 @@ export default function App() {
   const [liveOnly, setLiveOnly] = useState(false)
   // ponytail: โหมดเสียงอย่างเดียว (ย่อจอ+240p) จำไว้ข้าม session — ช่วยเครื่องเก่าไม่ lag
   const [audioOnly, setAudioOnly] = useState(() => { try { return localStorage.getItem('yt-audio-mode') === '1' } catch { return false } })
+  // ponytail: โหมดรถ — ขยายจอ Now Playing + ปุ่มให้กดง่ายบนจอรถ
+  const [carMode, setCarMode] = useState(() => { try { return localStorage.getItem('yt-car-mode') === '1' } catch { return false } })
+  function toggleCar() {
+    setCarMode((v) => { const n = !v; try { localStorage.setItem('yt-car-mode', n ? '1' : '0') } catch { /* ข้าม */ } return n })
+  }
   const lastQ = useRef('')
   const [quotaTick, setQuotaTick] = useState(0)
   // ponytail: อ่าน quota ใหม่ทุก render ที่ tick เปลี่ยน ไม่ต้อง subscribe
@@ -315,7 +320,7 @@ export default function App() {
   const list = searched ? videos : trending
 
   return (
-    <div className={audioOnly ? 'app audiomode' : 'app'}>
+    <div className={['app', audioOnly && 'audiomode', carMode && 'carmode'].filter(Boolean).join(' ')}>
       <div className="header">
         <div className="logo">
           <span>▶</span> YT No Ads
@@ -339,6 +344,13 @@ export default function App() {
               >
                 🎧 เสียงอย่างเดียว
               </button>
+              <button
+                className={carMode ? 'audiotoggle on' : 'audiotoggle'}
+                title="โหมดรถ — ขยายจอเพลง + ปุ่มใหญ่"
+                onClick={toggleCar}
+              >
+                🚗 โหมดรถ
+              </button>
               <label className="livecheck" title="ติ๊กแล้วค้นหาเฉพาะวิดีโอที่กำลังไลฟ์สด (eventType=live, cost เท่าเดิม 100 units)">
               <input type="checkbox" checked={liveOnly} onChange={(e) => { const v = e.target.checked; setLiveOnly(v); if (searched && lastQ.current.trim()) void doSearch(lastQ.current, v) }} />
               🔴 ไลฟ์สดอย่างเดียว
@@ -358,6 +370,7 @@ export default function App() {
           id={current.id}
           track={current}
           audioOnly={audioOnly}
+          onToggleCar={toggleCar}
           onClose={() => { setCurrent(null); setQueue([]) }}
           onEnded={queue.length > 1 ? next : undefined}
           onNext={queue.length > 1 ? next : undefined}
