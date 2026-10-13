@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface Props {
   id: string
@@ -20,6 +20,14 @@ interface ApiPlayer {
   playVideo: () => void
   pauseVideo: () => void
   setPlaybackQuality: (q: string) => void
+  getCurrentTime: () => number
+  getDuration: () => number
+  seekTo: (s: number, allowSeekAhead: boolean) => void
+}
+
+function fmt(s: number): string {
+  if (!isFinite(s) || s < 0) s = 0
+  return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`
 }
 declare global {
   interface Window {
@@ -69,6 +77,10 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   trackRef.current = track
   const audioRef = useRef(audioOnly)
   audioRef.current = audioOnly
+  // ponytail: state ไว้โชว์การ์ด Spotify — playing/progress อัปเดตจาก player ตรงๆ
+  const [playing, setPlaying] = useState(false)
+  const [ctl, setCtl] = useState(false)
+  const [prog, setProg] = useState({ t: 0, d: 0 })
   if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null
 
   // ponytail: Media Session — ปุ่มพวงมาลัย/CarPlay/Control Center คุมแอปได้ (play/pause/next/prev)
@@ -114,8 +126,12 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
           videoId: idRef.current,
           playerVars: { autoplay: 1, rel: 0 },
           events: {
-            onReady: () => { if (audioRef.current) { try { playerRef.current?.setPlaybackQuality('tiny') } catch { /* ข้าม */ } } },
-            onStateChange: (e: { data: number }) => { if (e.data === 0) endedRef.current?.() },
+            onReady: () => { setCtl(true); if (audioRef.current) { try { playerRef.current?.setPlaybackQuality('tiny') } catch { /* ข้าม */ } } },
+            onStateChange: (e: { data: number }) => {
+              if (e.data === 0) endedRef.current?.()
+              else if (e.data === 1) setPlaying(true)
+              else if (e.data === 2) setPlaying(false)
+            },
             // ponytail: คลิป unavailable/ห้าม embed ยิง error (ไม่ใช่ ENDED) → รอ 1.5s แล้วข้ามเพลงถ้ายังอยู่ที่เดิม
             onError: () => {
               const bad = idRef.current
@@ -145,6 +161,33 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   useEffect(() => {
     try { playerRef.current?.setPlaybackQuality(audioOnly ? 'tiny' : 'auto') } catch { /* ยังไม่พร้อม */ }
   }, [audioOnly, id])
+
+  // แถบเวลา: ถาม player ทุกวิ (โหมดเสียงเท่านั้น)
+  useEffect(() => {
+    if (!audioOnly) return
+    const iv = window.setInterval(() => {
+      try {
+        const p = playerRef.current
+        if (p) setProg({ t: p.getCurrentTime() || 0, d: p.getDuration() || 0 })
+      } catch { /* ข้าม */ }
+    }, 1000)
+    return () => window.clearInterval(iv)
+  }, [audioOnly, id])
+
+  function toggle() {
+    try {
+      if (playing) playerRef.current?.pauseVideo()
+      else playerRef.current?.playVideo()
+    } catch { /* ข้าม */ }
+  }
+
+  function seek(e: React.MouseEvent<HTMLDivElement>) {
+    const p = playerRef.current
+    if (!p || !prog.d) return
+    const r = e.currentTarget.getBoundingClientRect()
+    const frac = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))
+    try { p.seekTo(frac * prog.d, true) } catch { /* ข้าม */ }
+  }
   useEffect(() => {
     if (playerRef.current) playerRef.current.loadVideoById(id)
     else {
@@ -163,6 +206,22 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   return (
     <div className="player-wrap" ref={wrapRef}>
       <div className="player" ref={boxRef} />
+      {audioOnly && track && (
+        <div className="audiocard">
+          <img src={track.thumb} alt="" loading="lazy" />
+          <div className="atitle">{track.title}</div>
+          <div className="aartist">{track.channel}</div>
+          <div className="pbar" onClick={seek}>
+            <div className="pfill" style={{ width: `${prog.d ? (prog.t / prog.d) * 100 : 0}%` }} />
+          </div>
+          <div className="ptime"><span>{fmt(prog.t)}</span><span>{fmt(prog.d)}</span></div>
+          {ctl && (
+            <button className="bigplay" onClick={toggle} aria-label={playing ? 'หยุด' : 'เล่น'}>
+              {playing ? '⏸' : '▶'}
+            </button>
+          )}
+        </div>
+      )}
       <div className="row">
         {(onPrev || onNext || onShuffle) && (
           <>

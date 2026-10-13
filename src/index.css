@@ -58,6 +58,14 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .audiotoggle { border: 1px solid #333; background: #212121; color: #ccc; padding: 7px 12px; border-radius: 15px; cursor: pointer; font-size: 13px; white-space: nowrap; }
 .audiotoggle.on { background: #fff; color: #000; font-weight: 700; border-color: #fff; }
 .audiomode .player { aspect-ratio: auto; height: 2px; min-height: 0; overflow: hidden; opacity: .01; }
+.audiocard { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 10px 0 4px; }
+.audiocard img { width: 100%; max-width: 300px; border-radius: 12px; aspect-ratio: 16/9; object-fit: cover; background: #222; }
+.atitle { font-weight: 700; font-size: 15px; }
+.aartist { color: #aaa; font-size: 13px; }
+.pbar { width: 100%; max-width: 300px; height: 4px; background: #333; border-radius: 2px; cursor: pointer; }
+.pfill { height: 100%; background: #ff0033; border-radius: 2px; }
+.ptime { width: 100%; max-width: 300px; display: flex; justify-content: space-between; font-size: 11px; color: #aaa; }
+.bigplay { width: 56px; height: 56px; border-radius: 50%; border: 0; background: #fff; color: #000; font-size: 22px; cursor: pointer; }
 .syncbox { background: #1c1c1c; border: 1px solid #2c2c2c; border-radius: 12px; padding: 12px; margin: 0 0 12px; }
 .syncbox .muted { margin-top: 8px; display: block; }
 .plist { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
