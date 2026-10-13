@@ -292,18 +292,22 @@ export default function App() {
         </nav>
         {menu === 'home' && (
           <>
-            <SearchBar onSearch={(q) => { lastQ.current = q; void doSearch(q) }} onType={(q) => { lastQ.current = q; if (q.trim().length >= 3) debounced(q) }} />
-            <button
-              className={audioOnly ? 'audiotoggle on' : 'audiotoggle'}
-              title="โหมดเสียงอย่างเดียว (ย่อจอ+240p ประหยัดเครื่อง)"
-              onClick={() => { const v = !audioOnly; setAudioOnly(v); try { localStorage.setItem('yt-audio-mode', v ? '1' : '0') } catch { /* ข้าม */ } }}
-            >
-              🎧 เสียงอย่างเดียว
-            </button>
-            <label className="livecheck" title="ติ๊กแล้วค้นหาเฉพาะวิดีโอที่กำลังไลฟ์สด (eventType=live, cost เท่าเดิม 100 units)">
+            <div className="searchrow">
+              <SearchBar onSearch={(q) => { lastQ.current = q; void doSearch(q) }} onType={(q) => { lastQ.current = q; if (q.trim().length >= 3) debounced(q) }} />
+            </div>
+            <div className="controlsrow">
+              <button
+                className={audioOnly ? 'audiotoggle on' : 'audiotoggle'}
+                title="โหมดเสียงอย่างเดียว (ย่อจอ+240p ประหยัดเครื่อง)"
+                onClick={() => { const v = !audioOnly; setAudioOnly(v); try { localStorage.setItem('yt-audio-mode', v ? '1' : '0') } catch { /* ข้าม */ } }}
+              >
+                🎧 เสียงอย่างเดียว
+              </button>
+              <label className="livecheck" title="ติ๊กแล้วค้นหาเฉพาะวิดีโอที่กำลังไลฟ์สด (eventType=live, cost เท่าเดิม 100 units)">
               <input type="checkbox" checked={liveOnly} onChange={(e) => { const v = e.target.checked; setLiveOnly(v); if (searched && lastQ.current.trim()) void doSearch(lastQ.current, v) }} />
               🔴 ไลฟ์สดอย่างเดียว
             </label>
+            </div>
           </>
         )}
         <div className="quota" title={`ใช้ไป ${quota.used}/${DAILY_LIMIT} units รีเซ็ตเที่ยงคืน Pacific (search=100 trending=1 playlist=1/หน้า ไม่นับ cache hit)`}>

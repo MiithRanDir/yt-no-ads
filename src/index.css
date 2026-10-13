@@ -5,8 +5,10 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .header { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
 .logo { font-weight: 800; font-size: 20px; white-space: nowrap; }
 .logo span { color: #ff0033; }
-.search { flex: 1; min-width: 200px; display: flex; gap: 8px; }
-.search input { flex: 1; padding: 10px 14px; border-radius: 20px; border: 1px solid #333; background: #212121; color: #fff; font-size: 15px; }
+.search { flex: 1; min-width: 0; display: flex; gap: 8px; }
+.search input { flex: 1; min-width: 0; padding: 10px 14px; border-radius: 20px; border: 1px solid #333; background: #212121; color: #fff; font-size: 15px; }
+.searchrow { flex: 1 1 100%; min-width: 0; }
+.controlsrow { flex: 1 1 100%; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .search button { padding: 10px 18px; border-radius: 20px; border: 0; background: #fff; cursor: pointer; font-weight: 600; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
 .card { cursor: pointer; background: transparent; border: 0; padding: 0; text-align: left; color: inherit; position: relative; }
