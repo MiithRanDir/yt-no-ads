@@ -84,16 +84,18 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   const [prog, setProg] = useState({ t: 0, d: 0 })
   if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null
 
-  // ponytail: Media Session — ปุ่มพวงมาลัย/CarPlay/Control Center คุมแอปได้ (play/pause/next/prev)
+  // ponytail: Media Session — ปุ่มพวงมาลัย/CarPlay/Control Center คุมแอปได้
+  // แยก try ทีละ action: browser บางตัว throw กับ action ที่ไม่รองรับ ถ้ารวม try เดียวตัวอื่นจะไม่ติดเลย
   useEffect(() => {
     const ms = navigator.mediaSession
     if (!ms) return
-    try {
-      ms.setActionHandler('play', () => { try { playerRef.current?.playVideo() } catch { /* ข้าม */ } ms.playbackState = 'playing' })
-      ms.setActionHandler('pause', () => { try { playerRef.current?.pauseVideo() } catch { /* ข้าม */ } ms.playbackState = 'paused' })
-      ms.setActionHandler('previoustrack', () => prevRef.current?.())
-      ms.setActionHandler('nexttrack', () => nextRef.current?.())
-    } catch { /* browser ไม่รองรับบาง action */ }
+    const set = (a: MediaSessionAction, fn: () => void) => {
+      try { ms.setActionHandler(a, fn) } catch { /* browser นี้ไม่รองรับ */ }
+    }
+    set('play', () => { try { playerRef.current?.playVideo() } catch { /* ข้าม */ } try { ms.playbackState = 'playing' } catch { /* ข้าม */ } })
+    set('pause', () => { try { playerRef.current?.pauseVideo() } catch { /* ข้าม */ } try { ms.playbackState = 'paused' } catch { /* ข้าม */ } })
+    set('previoustrack', () => prevRef.current?.())
+    set('nexttrack', () => nextRef.current?.())
   }, [])
 
   // ชื่อเพลง/ปกขึ้นจอรถ + lock screen
