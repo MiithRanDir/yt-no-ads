@@ -9,10 +9,18 @@ interface Props {
   onShuffle?: () => void
   hasNext?: boolean
   hasPrev?: boolean
+  track?: { title: string; channel: string; thumb: string }
+  audioOnly?: boolean
 }
 
 // ponytail: IFrame API จับ event จบคลิป (ENDED=0) เพื่อ auto-next ไม่ใช้ timer
-interface ApiPlayer { loadVideoById: (id: string) => void; destroy: () => void }
+interface ApiPlayer {
+  loadVideoById: (id: string) => void
+  destroy: () => void
+  playVideo: () => void
+  pauseVideo: () => void
+  setPlaybackQuality: (q: string) => void
+}
 declare global {
   interface Window {
     YT?: { Player: new (el: HTMLElement, opts: unknown) => ApiPlayer }
@@ -45,7 +53,7 @@ function plainSrc(id: string) {
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`
 }
 
-export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev }: Props) {
+export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<ApiPlayer | null>(null)
@@ -53,9 +61,42 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   idRef.current = id
   const endedRef = useRef(onEnded)
   endedRef.current = onEnded
+  const nextRef = useRef(onNext)
+  nextRef.current = onNext
+  const prevRef = useRef(onPrev)
+  prevRef.current = onPrev
+  const trackRef = useRef(track)
+  trackRef.current = track
+  const audioRef = useRef(audioOnly)
+  audioRef.current = audioOnly
   if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null
 
-  // ponytail: YT.Player แทนที่ node ที่ครอบมัน ห้ามครอบ node ที่ React จัดการ
+  // ponytail: Media Session — ปุ่มพวงมาลัย/CarPlay/Control Center คุมแอปได้ (play/pause/next/prev)
+  useEffect(() => {
+    const ms = navigator.mediaSession
+    if (!ms) return
+    try {
+      ms.setActionHandler('play', () => { try { playerRef.current?.playVideo() } catch { /* ข้าม */ } ms.playbackState = 'playing' })
+      ms.setActionHandler('pause', () => { try { playerRef.current?.pauseVideo() } catch { /* ข้าม */ } ms.playbackState = 'paused' })
+      ms.setActionHandler('previoustrack', () => prevRef.current?.())
+      ms.setActionHandler('nexttrack', () => nextRef.current?.())
+    } catch { /* browser ไม่รองรับบาง action */ }
+  }, [])
+
+  // ชื่อเพลง/ปกขึ้นจอรถ + lock screen
+  useEffect(() => {
+    const ms = navigator.mediaSession
+    if (!ms || typeof MediaMetadata === 'undefined') return
+    const t = trackRef.current
+    try {
+      ms.metadata = new MediaMetadata({
+        title: t?.title ?? 'YT No Ads',
+        artist: t?.channel ?? '',
+        album: 'YT No Ads',
+        artwork: t?.thumb ? [{ src: t.thumb, sizes: '320x180', type: 'image/jpeg' }] : [],
+      })
+    } catch { /* ข้าม */ }
+  }, [id])
   // เลยให้ React ถือแค่กล่องเปล่า แล้วสร้าง player แบบ imperative ข้างในครั้งเดียว
   useEffect(() => {
     const box = boxRef.current
@@ -73,6 +114,7 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
           videoId: idRef.current,
           playerVars: { autoplay: 1, rel: 0 },
           events: {
+            onReady: () => { if (audioRef.current) { try { playerRef.current?.setPlaybackQuality('small') } catch { /* ข้าม */ } } },
             onStateChange: (e: { data: number }) => { if (e.data === 0) endedRef.current?.() },
             // ponytail: คลิป unavailable/ห้าม embed ยิง error (ไม่ใช่ ENDED) → รอ 1.5s แล้วข้ามเพลงถ้ายังอยู่ที่เดิม
             onError: () => {
@@ -99,7 +141,10 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
     }
   }, [])
 
-  // เปลี่ยนเพลง: สั่ง player เดิมโหลดใหม่ ไม่แตะ DOM
+  // โหมดเสียงอย่างเดียว: บังคับ 240p ประหยัดเครื่อง (กลับปกติใช้ auto)
+  useEffect(() => {
+    try { playerRef.current?.setPlaybackQuality(audioOnly ? 'small' : 'auto') } catch { /* ยังไม่พร้อม */ }
+  }, [audioOnly, id])
   useEffect(() => {
     if (playerRef.current) playerRef.current.loadVideoById(id)
     else {

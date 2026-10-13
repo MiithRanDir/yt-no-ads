@@ -20,6 +20,8 @@ export default function App() {
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
   const [liveOnly, setLiveOnly] = useState(false)
+  // ponytail: โหมดเสียงอย่างเดียว (ย่อจอ+240p) จำไว้ข้าม session — ช่วยเครื่องเก่าไม่ lag
+  const [audioOnly, setAudioOnly] = useState(() => { try { return localStorage.getItem('yt-audio-mode') === '1' } catch { return false } })
   const lastQ = useRef('')
   const [quotaTick, setQuotaTick] = useState(0)
   // ponytail: อ่าน quota ใหม่ทุก render ที่ tick เปลี่ยน ไม่ต้อง subscribe
@@ -277,7 +279,7 @@ export default function App() {
   const list = searched ? videos : trending
 
   return (
-    <div className="app">
+    <div className={audioOnly ? 'app audiomode' : 'app'}>
       <div className="header">
         <div className="logo">
           <span>▶</span> YT No Ads
@@ -291,6 +293,13 @@ export default function App() {
         {menu === 'home' && (
           <>
             <SearchBar onSearch={(q) => { lastQ.current = q; void doSearch(q) }} onType={(q) => { lastQ.current = q; if (q.trim().length >= 3) debounced(q) }} />
+            <button
+              className={audioOnly ? 'audiotoggle on' : 'audiotoggle'}
+              title="โหมดเสียงอย่างเดียว (ย่อจอ+240p ประหยัดเครื่อง)"
+              onClick={() => { const v = !audioOnly; setAudioOnly(v); try { localStorage.setItem('yt-audio-mode', v ? '1' : '0') } catch { /* ข้าม */ } }}
+            >
+              🎧 เสียงอย่างเดียว
+            </button>
             <label className="livecheck" title="ติ๊กแล้วค้นหาเฉพาะวิดีโอที่กำลังไลฟ์สด (eventType=live, cost เท่าเดิม 100 units)">
               <input type="checkbox" checked={liveOnly} onChange={(e) => { const v = e.target.checked; setLiveOnly(v); if (searched && lastQ.current.trim()) void doSearch(lastQ.current, v) }} />
               🔴 ไลฟ์สดอย่างเดียว
@@ -307,6 +316,8 @@ export default function App() {
       {current && (
         <Player
           id={current.id}
+          track={current}
+          audioOnly={audioOnly}
           onClose={() => { setCurrent(null); setQueue([]) }}
           onEnded={queue.length > 1 ? next : undefined}
           onNext={queue.length > 1 ? next : undefined}
