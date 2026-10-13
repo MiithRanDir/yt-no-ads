@@ -8,6 +8,7 @@ import { usePlaylists } from './hooks/usePlaylists'
 import { debounce, fetchPlaylistItems, getTrending, searchVideos, type VideoItem } from './lib/youtube'
 import { COST_PLAYLIST, getQuota, DAILY_LIMIT } from './lib/quota'
 import { parseYoutubeListId, exportJSON as playlistsToJSON } from './lib/playlists'
+import { loadSession, saveSession } from './lib/session'
 import { syncLogin, syncLogout, syncPull, syncPush } from './lib/sync'
 
 type Menu = 'home' | 'playlists'
@@ -33,6 +34,7 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [queue, setQueue] = useState<VideoItem[]>([])
   const [qi, setQi] = useState(0)
+  const [queuePid, setQueuePid] = useState<string | null>(null)
   const [picker, setPicker] = useState<VideoItem | null>(null)
   const [notice, setNotice] = useState('')
   const [importUrl, setImportUrl] = useState('')
@@ -99,7 +101,34 @@ export default function App() {
     }
   }
 
-  // เปิดแอป: ลองดึงล่าสุดอัตโนมัติ (ยังไม่ login ก็ใช้ local ต่อได้)
+  // เปิดแอป: resume จาก session ล่าสุด (ไม่ autoplay — browser บล็อกเสียง ให้กดเล่นเอง)
+  useEffect(() => {
+    try {
+      const s = loadSession()
+      if (!s) return
+      if (s.pid) {
+        const p = playlists.find((x) => x.id === s.pid)
+        if (!p || p.items.length === 0) return
+        let i = s.qi
+        if (p.items[i]?.id !== s.item.id) {
+          const f = p.items.findIndex((x) => x.id === s.item.id)
+          i = f >= 0 ? f : 0
+        }
+        setQueue(p.items)
+        setQi(i)
+        setQueuePid(p.id)
+        setCurrent(p.items[i])
+        flash(`▶ ต่อจากเดิม: “${p.name}” เพลงที่ ${i + 1}/${p.items.length}`)
+      } else {
+        setQueue([])
+        setQi(0)
+        setQueuePid(null)
+        setCurrent(s.item)
+        flash('▶ ต่อจากเพลงล่าสุด')
+      }
+    } catch { /* ข้าม */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => {
     void doSyncPull(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,15 +185,19 @@ export default function App() {
   function play(v: VideoItem) {
     setCurrent(v)
     setQueue([])
+    setQueuePid(null)
+    saveSession({ pid: null, qi: 0, item: v })
     push(v)
     window.scrollTo({ top: 0 })
   }
 
-  function playQueue(items: VideoItem[], start: number) {
+  function playQueue(items: VideoItem[], start: number, pid: string | null = null) {
     if (!items[start]) return
     setQueue(items)
     setQi(start)
+    setQueuePid(pid)
     setCurrent(items[start])
+    saveSession({ pid, qi: start, item: items[start] })
     push(items[start])
     window.scrollTo({ top: 0 })
   }
@@ -174,6 +207,7 @@ export default function App() {
     const n = (qi + 1) % queue.length
     setQi(n)
     setCurrent(queue[n])
+    saveSession({ pid: queuePid, qi: n, item: queue[n] })
     push(queue[n])
   }
 
@@ -182,6 +216,7 @@ export default function App() {
     const n = (qi - 1 + queue.length) % queue.length
     setQi(n)
     setCurrent(queue[n])
+    saveSession({ pid: queuePid, qi: n, item: queue[n] })
     push(queue[n])
   }
 
@@ -190,6 +225,7 @@ export default function App() {
     const n = Math.floor(Math.random() * queue.length)
     setQi(n)
     setCurrent(queue[n])
+    saveSession({ pid: queuePid, qi: n, item: queue[n] })
     push(queue[n])
   }
 
@@ -430,14 +466,14 @@ export default function App() {
           <div className="prow rename">
             <input value={renameVal} onChange={(e) => setRenameVal(e.target.value)} placeholder="ชื่อเพลย์ลิสต์…" aria-label="ชื่อเพลย์ลิสต์" />
             <button onClick={() => { rename(active.id, renameVal) }} disabled={!renameVal.trim() || renameVal.trim() === active.name}>บันทึกชื่อ</button>
-            <button className="clear" onClick={() => { if (active.items.length > 0) playQueue(active.items, Math.floor(Math.random() * active.items.length)) }} disabled={active.items.length === 0}>🔀 สุ่มเล่น</button>
-            <button className="clear" onClick={() => { if (active.items.length > 0) playQueue(active.items, 0) }} disabled={active.items.length === 0}>▶ เล่นทั้งหมด</button>
+            <button className="clear" onClick={() => { if (active.items.length > 0) playQueue(active.items, Math.floor(Math.random() * active.items.length), active.id) }} disabled={active.items.length === 0}>🔀 สุ่มเล่น</button>
+            <button className="clear" onClick={() => { if (active.items.length > 0) playQueue(active.items, 0, active.id) }} disabled={active.items.length === 0}>▶ เล่นทั้งหมด</button>
             <button className="clear danger" onClick={() => { remove(active.id); setActiveId(null) }}>ลบเพลย์ลิสต์</button>
           </div>
           <div className="grid">
             {active.items.map((v, i) => (
               <div key={v.id} className="qwrap">
-                <VideoCard v={v} onPlay={(vv) => playQueue(active.items, active.items.findIndex((x) => x.id === vv.id))} onAdd={setPicker} />
+                <VideoCard v={v} onPlay={(vv) => playQueue(active.items, active.items.findIndex((x) => x.id === vv.id), active.id)} onAdd={setPicker} />
                 <button className="clear" onClick={() => removeItem(active.id, v.id)} title="ลบออกจากเพลย์ลิสต์">ลบออก ({i + 1})</button>
               </div>
             ))}
