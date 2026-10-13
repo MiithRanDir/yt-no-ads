@@ -57,7 +57,7 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .qwrap { display: flex; flex-direction: column; gap: 2px; }
 .audiotoggle { border: 1px solid #333; background: #212121; color: #ccc; padding: 7px 12px; border-radius: 15px; cursor: pointer; font-size: 13px; white-space: nowrap; }
 .audiotoggle.on { background: #fff; color: #000; font-weight: 700; border-color: #fff; }
-.audiomode .player { aspect-ratio: auto; height: 0; min-height: 0; overflow: hidden; }
+.audiomode .player { aspect-ratio: auto; height: 2px; min-height: 0; overflow: hidden; opacity: .01; }
 .syncbox { background: #1c1c1c; border: 1px solid #2c2c2c; border-radius: 12px; padding: 12px; margin: 0 0 12px; }
 .syncbox .muted { margin-top: 8px; display: block; }
 .plist { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
