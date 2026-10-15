@@ -31,6 +31,15 @@ export default function App() {
   function toggleLoop() {
     setLoopOne((v) => { const n = !v; try { localStorage.setItem('yt-loop-one', n ? '1' : '0') } catch { /* ข้าม */ } return n })
   }
+  // ponytail: ปุ่มลัด PiP — เว็บสั่ง PiP ข้าม iframe ไม่ได้ เลยพากลับจอวิดีโอ + ชี้ปุ่ม PiP ของตัวเล่นให้
+  const [pipHint, setPipHint] = useState(false)
+  function pipHelp() {
+    setAudioOnly(false)
+    try { localStorage.setItem('yt-audio-mode', '0') } catch { /* ข้าม */ }
+    setPipHint(true)
+    window.scrollTo({ top: 0 })
+    window.setTimeout(() => setPipHint(false), 9000)
+  }
   function toggleCar() {
     setCarMode((v) => { const n = !v; try { localStorage.setItem('yt-car-mode', n ? '1' : '0') } catch { /* ข้าม */ } return n })
   }
@@ -372,6 +381,10 @@ export default function App() {
 
       {notice && <div className="notice">{notice}</div>}
 
+      {pipHint && current && (
+        <div className="notice">📺 กดปุ่ม PiP (สี่เหลี่ยมมีลูกศร) มุมล่างของตัวเล่น → แล้วล็อกจอฟังต่อได้เลย</div>
+      )}
+
       {current && (
         <Player
           id={current.id}
@@ -380,6 +393,7 @@ export default function App() {
           context={queuePid ? (playlists.find((p) => p.id === queuePid)?.name) : undefined}
           loopOne={loopOne}
           onToggleLoop={toggleLoop}
+          onPip={pipHelp}
           onToggleCar={toggleCar}
           onClose={() => { setCurrent(null); setQueue([]) }}
           onEnded={queue.length > 1 ? next : undefined}

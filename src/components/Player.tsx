@@ -15,6 +15,7 @@ interface Props {
   context?: string
   loopOne?: boolean
   onToggleLoop?: () => void
+  onPip?: () => void
   onToggleCar?: () => void
 }
 
@@ -66,7 +67,7 @@ function plainSrc(id: string) {
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`
 }
 
-export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly, context, loopOne, onToggleLoop, onToggleCar }: Props) {
+export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly, context, loopOne, onToggleLoop, onPip, onToggleCar }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<ApiPlayer | null>(null)
@@ -264,6 +265,9 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
             )}
             <button className="sp-glyph" onClick={onClose} title="ปิด">✕</button>
           </div>
+          {onPip && (
+            <button className="piphelp" onClick={onPip}>📺 เปิด PiP แล้วล็อกจอฟังต่อได้</button>
+          )}
         </div>
       )}
       {audioOnly && track && mini && (
