@@ -83,6 +83,7 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   // ponytail: state ไว้โชว์การ์ด Spotify — playing/progress อัปเดตจาก player ตรงๆ
   const [playing, setPlaying] = useState(false)
   const [ctl, setCtl] = useState(false)
+  const [mini, setMini] = useState(false)
   const [prog, setProg] = useState({ t: 0, d: 0 })
   if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null
 
@@ -219,11 +220,11 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   return (
     <div className="player-wrap" ref={wrapRef}>
       <div className="player" ref={boxRef} />
-      {audioOnly && track && (
+      {audioOnly && track && !mini && (
         <div className="audiofull" style={{ '--art': `url("${track.thumb}")` } as CSSProperties}>
           <button className="carfab" onClick={onToggleCar} title="โหมดรถ — ขยาย/ย่อ">🚗</button>
           <div className="sp-top">
-            <button className="sp-chev" onClick={onClose} aria-label="ย่อ">⌄</button>
+            <button className="sp-chev" onClick={() => setMini(true)} aria-label="ย่อ (เพลงเล่นต่อ)" title="ย่อ (เพลงเล่นต่อ)">⌄</button>
             <div className="sp-context">{context ?? 'กำลังเล่น'}</div>
             <span className="sp-chev" aria-hidden="true" />
           </div>
@@ -249,6 +250,17 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
             {onNext ? <button className="sp-glyph big" onClick={onNext} disabled={!hasNext} title="ถัดไป (Shift+N)">⏭</button> : <span />}
             <button className="sp-glyph" onClick={onClose} title="ปิด">✕</button>
           </div>
+        </div>
+      )}
+      {audioOnly && track && mini && (
+        <div className="minibar">
+          <img src={track.thumb} alt="" loading="lazy" />
+          <div className="mtitle">{track.title}</div>
+          {ctl && (
+            <button onClick={toggle} aria-label={playing ? 'หยุด' : 'เล่น'}>{playing ? '⏸' : '▶'}</button>
+          )}
+          <button onClick={() => setMini(false)} aria-label="ขยาย" title="ขยาย">▲</button>
+          <button onClick={onClose} aria-label="ปิด" title="ปิด">✕</button>
         </div>
       )}
       {!audioOnly && (
