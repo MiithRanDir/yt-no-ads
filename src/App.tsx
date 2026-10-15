@@ -372,6 +372,7 @@ export default function App() {
           id={current.id}
           track={current}
           audioOnly={audioOnly}
+          context={queuePid ? (playlists.find((p) => p.id === queuePid)?.name) : undefined}
           onToggleCar={toggleCar}
           onClose={() => { setCurrent(null); setQueue([]) }}
           onEnded={queue.length > 1 ? next : undefined}

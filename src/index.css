@@ -59,31 +59,37 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .audiotoggle { border: 1px solid #333; background: #212121; color: #ccc; padding: 7px 12px; border-radius: 15px; cursor: pointer; font-size: 13px; white-space: nowrap; }
 .audiotoggle.on { background: #fff; color: #000; font-weight: 700; border-color: #fff; }
 .audiomode .player { aspect-ratio: auto; height: 2px; min-height: 0; overflow: hidden; opacity: .01; }
-.audiofull { position: fixed; inset: 0; z-index: 60; background: #0f0f0f; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; padding: 24px 16px; overflow-y: auto; }
-.audiofull img { width: 100%; max-width: min(480px, 84vw, 110vh); border-radius: 16px; aspect-ratio: 16/9; object-fit: cover; background: #222; }
-.audiofull .atitle { font-weight: 800; font-size: clamp(16px, 3.4vmin, 22px); max-width: 92vw; }
-.audiofull .aartist { color: #aaa; font-size: 14px; }
-.audiofull .pbar { max-width: 420px; }
-.audiofull .ptime { max-width: 420px; }
-.arow { display: flex; gap: 14px; align-items: center; margin-top: 6px; }
-.abtn { width: 56px; height: 56px; border-radius: 50%; border: 0; background: #272727; color: #fff; font-size: 24px; cursor: pointer; }
-.abtn.big { font-size: 30px; }
-.abtn:disabled { opacity: .35; }
-.audiofull .bigplay { width: 76px; height: 76px; font-size: 28px; }
-.aclose { margin-top: 10px; background: #272727; color: #fff; border: 0; padding: 10px 22px; border-radius: 18px; cursor: pointer; }
+.audiofull { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); overflow-y: auto; background: #101010; isolation: isolate; }
+.audiofull::before { content: ''; position: fixed; inset: -60px; background-image: var(--art); background-size: cover; background-position: center; filter: blur(80px) brightness(.4) saturate(1.5); z-index: -1; }
+.sp-top { width: 100%; max-width: 460px; display: flex; align-items: center; }
+.sp-chev { background: none; border: 0; color: #fff; font-size: 32px; line-height: 1; cursor: pointer; padding: 4px 12px; min-width: 56px; text-align: left; }
+span.sp-chev { visibility: hidden; }
+.sp-context { flex: 1; font-size: 13px; font-weight: 600; letter-spacing: .5px; color: rgba(255,255,255,.85); }
+.sp-art { width: 100%; max-width: min(380px, 80vw, 44vh); aspect-ratio: 1; object-fit: cover; border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.55); background: #222; }
+.sp-meta { width: 100%; max-width: 460px; text-align: left; }
+.audiofull .atitle { font-weight: 800; font-size: clamp(17px, 3.6vmin, 24px); }
+.audiofull .aartist { color: rgba(255,255,255,.6); font-size: clamp(13px, 2.8vmin, 17px); margin-top: 2px; }
+.audiofull .pbar { max-width: 460px; height: 5px; background: rgba(255,255,255,.22); }
+.audiofull .ptime { max-width: 460px; color: rgba(255,255,255,.6); }
+.arow { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 4px; }
+.sp-glyph { background: none; border: 0; color: #fff; font-size: 28px; cursor: pointer; padding: 10px; min-width: 56px; }
+.sp-glyph.big { font-size: 46px; }
+.sp-glyph:disabled { opacity: .3; }
+.audiofull .bigplay { width: 74px; height: 74px; font-size: 27px; }
 .carfab { position: absolute; top: 14px; right: 14px; width: 52px; height: 52px; border-radius: 50%; border: 1px solid #333; background: #212121; font-size: 24px; cursor: pointer; }
 /* ponytail: โหมดรถ — ขยายตามจอด้วย vmin/vh กดง่ายบนจอรถ (จอ landscape สูงจำกัด เลยคุมด้วย vh) */
 .carmode .audiofull { gap: clamp(8px, 2vmin, 18px); }
-.carmode .audiofull img { max-width: min(760px, 94vw, 125vh); }
-.carmode .audiofull .atitle { font-size: clamp(22px, 5vmin, 40px); max-width: 94vw; }
+.carmode .sp-art { max-width: min(560px, 88vw, 58vh); }
+.carmode .audiofull .atitle { font-size: clamp(22px, 5vmin, 40px); }
 .carmode .audiofull .aartist { font-size: clamp(16px, 3.2vmin, 26px); }
-.carmode .audiofull .pbar, .carmode .audiofull .ptime { max-width: min(760px, 94vw); }
+.carmode .audiofull .pbar, .carmode .audiofull .ptime { max-width: min(560px, 88vw); }
 .carmode .pbar { height: 8px; }
-.carmode .abtn { width: clamp(72px, 14vmin, 120px); height: clamp(72px, 14vmin, 120px); font-size: clamp(30px, 6vmin, 54px); }
+.carmode .sp-glyph { font-size: clamp(34px, 6vmin, 56px); min-width: clamp(64px, 12vmin, 110px); }
+.carmode .sp-glyph.big { font-size: clamp(52px, 9vmin, 84px); }
 .carmode .audiofull .bigplay { width: clamp(100px, 20vmin, 160px); height: clamp(100px, 20vmin, 160px); font-size: clamp(38px, 8vmin, 64px); }
-.carmode .aclose { padding: 16px 36px; font-size: 19px; }
 .pbar { width: 100%; max-width: 300px; height: 4px; background: #333; border-radius: 2px; cursor: pointer; }
-.pfill { height: 100%; background: #ff0033; border-radius: 2px; }
+.pfill { height: 100%; background: #ff0033; border-radius: 2px; position: relative; }
+.pfill::after { content: ''; position: absolute; right: -6px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: #fff; }
 .ptime { width: 100%; max-width: 300px; display: flex; justify-content: space-between; font-size: 11px; color: #aaa; }
 .bigplay { width: 56px; height: 56px; border-radius: 50%; border: 0; background: #fff; color: #000; font-size: 22px; cursor: pointer; }
 .syncbox { background: #1c1c1c; border: 1px solid #2c2c2c; border-radius: 12px; padding: 12px; margin: 0 0 12px; }

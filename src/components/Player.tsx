@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 
 interface Props {
   id: string
@@ -11,6 +12,7 @@ interface Props {
   hasPrev?: boolean
   track?: { title: string; channel: string; thumb: string }
   audioOnly?: boolean
+  context?: string
   onToggleCar?: () => void
 }
 
@@ -62,7 +64,7 @@ function plainSrc(id: string) {
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`
 }
 
-export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly, onToggleCar }: Props) {
+export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly, context, onToggleCar }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<ApiPlayer | null>(null)
@@ -210,18 +212,25 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
     <div className="player-wrap" ref={wrapRef}>
       <div className="player" ref={boxRef} />
       {audioOnly && track && (
-        <div className="audiofull">
+        <div className="audiofull" style={{ '--art': `url("${track.thumb}")` } as CSSProperties}>
           <button className="carfab" onClick={onToggleCar} title="โหมดรถ — ขยาย/ย่อ">🚗</button>
-          <img src={track.thumb} alt="" loading="lazy" />
-          <div className="atitle">{track.title}</div>
-          <div className="aartist">{track.channel}</div>
+          <div className="sp-top">
+            <button className="sp-chev" onClick={onClose} aria-label="ย่อ">⌄</button>
+            <div className="sp-context">{context ?? 'กำลังเล่น'}</div>
+            <span className="sp-chev" aria-hidden="true" />
+          </div>
+          <img className="sp-art" src={track.thumb} alt="" loading="lazy" />
+          <div className="sp-meta">
+            <div className="atitle">{track.title}</div>
+            <div className="aartist">{track.channel}</div>
+          </div>
           <div className="pbar" onClick={seek}>
             <div className="pfill" style={{ width: `${prog.d ? (prog.t / prog.d) * 100 : 0}%` }} />
           </div>
-          <div className="ptime"><span>{fmt(prog.t)}</span><span>{fmt(prog.d)}</span></div>
+          <div className="ptime"><span>{fmt(prog.t)}</span><span>-{fmt(Math.max(0, prog.d - prog.t))}</span></div>
           <div className="arow">
-            {onShuffle && <button className="abtn" onClick={onShuffle} title="สุ่ม">🔀</button>}
-            {onPrev && <button className="abtn big" onClick={onPrev} disabled={!hasPrev} title="ก่อนหน้า (Shift+P)">‹</button>}
+            {onShuffle ? <button className="sp-glyph" onClick={onShuffle} title="สุ่ม">🔀</button> : <span />}
+            {onPrev ? <button className="sp-glyph big" onClick={onPrev} disabled={!hasPrev} title="ก่อนหน้า (Shift+P)">⏮</button> : <span />}
             {ctl ? (
               <button className="bigplay" onClick={toggle} aria-label={playing ? 'หยุด' : 'เล่น'}>
                 {playing ? '⏸' : '▶'}
@@ -229,9 +238,9 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
             ) : (
               <div className="muted">กำลังโหลด…</div>
             )}
-            {onNext && <button className="abtn big" onClick={onNext} disabled={!hasNext} title="ถัดไป (Shift+N)">›</button>}
+            {onNext ? <button className="sp-glyph big" onClick={onNext} disabled={!hasNext} title="ถัดไป (Shift+N)">⏭</button> : <span />}
+            <button className="sp-glyph" onClick={onClose} title="ปิด">✕</button>
           </div>
-          <button className="aclose" onClick={onClose}>✕ ปิด</button>
         </div>
       )}
       {!audioOnly && (
