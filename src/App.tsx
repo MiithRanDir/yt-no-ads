@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import SearchBar from './components/SearchBar'
+import InstallButton from './components/InstallButton'
 import VideoCard from './components/VideoCard'
 import Player from './components/Player'
 import PlaylistPicker from './components/PlaylistPicker'
@@ -331,6 +332,7 @@ export default function App() {
             🎵 เพลย์ลิสต์ ({playlists.length})
           </button>
         </nav>
+        <InstallButton />
         {menu === 'home' && (
           <>
             <div className="searchrow">

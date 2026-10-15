@@ -35,6 +35,7 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .tabs { display: flex; gap: 4px; background: #212121; border-radius: 18px; padding: 3px; }
 .tabs button { border: 0; background: transparent; color: #ccc; padding: 7px 14px; border-radius: 15px; cursor: pointer; font-size: 14px; white-space: nowrap; }
 .tabs button.on { background: #fff; color: #000; font-weight: 700; }
+.installbtn { border: 1px solid #333; background: #212121; color: #fff; padding: 7px 14px; border-radius: 15px; cursor: pointer; font-size: 14px; font-weight: 700; white-space: nowrap; }
 .notice { background: #14331f; color: #9df0b4; padding: 10px 14px; border-radius: 8px; margin: 0 0 12px; }
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
 .sheet { background: #1c1c1c; border: 1px solid #333; border-radius: 14px; padding: 18px; width: 100%; max-width: 420px; max-height: 80vh; overflow: auto; }
