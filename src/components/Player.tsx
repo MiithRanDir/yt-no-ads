@@ -13,6 +13,8 @@ interface Props {
   track?: { title: string; channel: string; thumb: string }
   audioOnly?: boolean
   context?: string
+  loopOne?: boolean
+  onToggleLoop?: () => void
   onToggleCar?: () => void
 }
 
@@ -64,7 +66,7 @@ function plainSrc(id: string) {
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`
 }
 
-export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly, context, onToggleCar }: Props) {
+export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly, context, loopOne, onToggleLoop, onToggleCar }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<ApiPlayer | null>(null)
@@ -80,6 +82,8 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   trackRef.current = track
   const audioRef = useRef(audioOnly)
   audioRef.current = audioOnly
+  const loopRef = useRef(loopOne)
+  loopRef.current = loopOne
   // ponytail: state ไว้โชว์การ์ด Spotify — playing/progress อัปเดตจาก player ตรงๆ
   const [playing, setPlaying] = useState(false)
   const [ctl, setCtl] = useState(false)
@@ -142,7 +146,12 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
           events: {
             onReady: () => { setCtl(true); if (audioRef.current) { try { playerRef.current?.setPlaybackQuality('tiny') } catch { /* ข้าม */ } } },
             onStateChange: (e: { data: number }) => {
-              if (e.data === 0) endedRef.current?.()
+              // ponytail: loop เพลงเดียว — จบแล้วกรอกลับเล่นใหม่เอง ไม่ต้องไป App
+              if (e.data === 0) {
+                if (loopRef.current && playerRef.current) {
+                  try { playerRef.current.seekTo(0, true); playerRef.current.playVideo() } catch { endedRef.current?.() }
+                } else endedRef.current?.()
+              }
               else if (e.data === 1) setPlaying(true)
               else if (e.data === 2) setPlaying(false)
             },
@@ -248,6 +257,11 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
               <div className="muted">กำลังโหลด…</div>
             )}
             {onNext ? <button className="sp-glyph big" onClick={onNext} disabled={!hasNext} title="ถัดไป (Shift+N)">⏭</button> : <span />}
+            {onToggleLoop && (
+              <button className={loopOne ? 'sp-glyph' : 'sp-glyph off'} onClick={onToggleLoop} title="เล่นเพลงนี้ซ้ำ">
+                🔂
+              </button>
+            )}
             <button className="sp-glyph" onClick={onClose} title="ปิด">✕</button>
           </div>
         </div>

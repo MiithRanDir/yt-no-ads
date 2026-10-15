@@ -26,6 +26,11 @@ export default function App() {
   const [audioOnly, setAudioOnly] = useState(() => { try { return localStorage.getItem('yt-audio-mode') === '1' } catch { return false } })
   // ponytail: โหมดรถ — ขยายจอ Now Playing + ปุ่มให้กดง่ายบนจอรถ
   const [carMode, setCarMode] = useState(() => { try { return localStorage.getItem('yt-car-mode') === '1' } catch { return false } })
+  // ponytail: loop เพลงเดียวซ้ำ จำไว้ข้าม session
+  const [loopOne, setLoopOne] = useState(() => { try { return localStorage.getItem('yt-loop-one') === '1' } catch { return false } })
+  function toggleLoop() {
+    setLoopOne((v) => { const n = !v; try { localStorage.setItem('yt-loop-one', n ? '1' : '0') } catch { /* ข้าม */ } return n })
+  }
   function toggleCar() {
     setCarMode((v) => { const n = !v; try { localStorage.setItem('yt-car-mode', n ? '1' : '0') } catch { /* ข้าม */ } return n })
   }
@@ -373,6 +378,8 @@ export default function App() {
           track={current}
           audioOnly={audioOnly}
           context={queuePid ? (playlists.find((p) => p.id === queuePid)?.name) : undefined}
+          loopOne={loopOne}
+          onToggleLoop={toggleLoop}
           onToggleCar={toggleCar}
           onClose={() => { setCurrent(null); setQueue([]) }}
           onEnded={queue.length > 1 ? next : undefined}

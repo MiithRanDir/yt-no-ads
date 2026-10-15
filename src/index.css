@@ -76,6 +76,7 @@ span.sp-chev { visibility: hidden; }
 .sp-glyph { background: none; border: 0; color: #fff; font-size: 28px; cursor: pointer; padding: 10px; min-width: 56px; }
 .sp-glyph.big { font-size: 46px; }
 .sp-glyph:disabled { opacity: .3; }
+.sp-glyph.off { opacity: .35; }
 .audiofull .bigplay { width: 74px; height: 74px; font-size: 27px; }
 .carfab { position: absolute; top: 14px; right: 14px; width: 52px; height: 52px; border-radius: 50%; border: 1px solid #333; background: #212121; font-size: 24px; cursor: pointer; }
 .minibar { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 60; display: flex; align-items: center; gap: 10px; background: rgba(28,28,28,.94); border: 1px solid #333; border-radius: 14px; padding: 8px 10px; }
