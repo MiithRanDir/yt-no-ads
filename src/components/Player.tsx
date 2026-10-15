@@ -100,6 +100,14 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
     set('nexttrack', () => nextRef.current?.())
   }, [])
 
+  // เปิดจอเพลง: ล็อกสกรอลล์พื้นหลังไว้ จอเดียวพอ ไม่ซ้อนกัน
+  useEffect(() => {
+    if (!(audioOnly && track)) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [audioOnly, track])
+
   // ชื่อเพลง/ปกขึ้นจอรถ + lock screen
   useEffect(() => {
     const ms = navigator.mediaSession

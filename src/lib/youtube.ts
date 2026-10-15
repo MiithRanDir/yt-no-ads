@@ -60,6 +60,11 @@ export function debounce<F extends (...args: any[]) => void>(fn: F, ms = 500) {
   }
 }
 
+// ponytail: YouTube ส่ง title มาแบบ escape HTML (&amp; &#39;) ต้องถอดก่อนโชว์
+function decode(s: string): string {
+  return s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+}
+
 function mapSearch(json: unknown): VideoItem[] {
   const items = (json as { items?: unknown[] })?.items ?? []
   return items
@@ -73,8 +78,8 @@ function mapSearch(json: unknown): VideoItem[] {
       const live = (v as { snippet?: { liveBroadcastContent?: string } }).snippet?.liveBroadcastContent === 'live'
       return {
         id,
-        title: v.snippet?.title ?? id,
-        channel: v.snippet?.channelTitle ?? '',
+        title: decode(v.snippet?.title ?? id),
+        channel: decode(v.snippet?.channelTitle ?? ''),
         thumb: v.snippet?.thumbnails?.medium?.url ?? `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
         ...(live ? { live: true as const } : {}),
       } as VideoItem
@@ -96,8 +101,8 @@ function mapVideos(json: unknown): VideoItem[] {
       const live = (v as { snippet?: { liveBroadcastContent?: string } }).snippet?.liveBroadcastContent === 'live'
       return {
         id: v.id,
-        title: v.snippet?.title ?? v.id,
-        channel: v.snippet?.channelTitle ?? '',
+        title: decode(v.snippet?.title ?? v.id),
+        channel: decode(v.snippet?.channelTitle ?? ''),
         thumb: v.snippet?.thumbnails?.medium?.url ?? `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`,
         ...(live ? { live: true as const } : {}),
       } as VideoItem
@@ -188,8 +193,8 @@ function mapPlaylist(json: unknown): VideoItem[] {
       if (!id || title === 'Private video' || title === 'Deleted video') return null
       return {
         id,
-        title: title || id,
-        channel: v.snippet?.channelTitle ?? '',
+        title: decode(title || id),
+        channel: decode(v.snippet?.channelTitle ?? ''),
         thumb: v.snippet?.thumbnails?.medium?.url ?? `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
       } as VideoItem
     })
