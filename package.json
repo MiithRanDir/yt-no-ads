@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node -e \"const fs=require('fs'); const v=Date.now().toString(); let s=fs.readFileSync('dist/sw.js','utf8'); s=s.replace('__APP_VERSION__', v); fs.writeFileSync('dist/sw.js', s); console.log('SW version:', v);\"",
     "preview": "vite preview"
   },
   "dependencies": {
