@@ -1,4 +1,5 @@
 import { addQuota, COST_PLAYLIST, COST_SEARCH, COST_TRENDING } from './quota'
+import { putCached, getCachedArray, putCachedArray } from './videoCache'
 
 export interface VideoItem {
   id: string
@@ -128,6 +129,12 @@ export async function searchVideos(q: string, opts?: { liveOnly?: boolean }): Pr
   if (!query) return []
   const liveOnly = opts?.liveOnly ?? false
   const key = liveOnly ? `s:live:${query}` : `s:${query}` // ponytail: แยก cache ไลฟ์/ปกติ กันปนกัน
+
+  // persistent array cache first
+  const cached = getCachedArray(key)
+  if (cached) return cached
+
+  // session cache fallback
   const hit = getCache(key)
   if (hit) return hit
 
@@ -137,6 +144,9 @@ export async function searchVideos(q: string, opts?: { liveOnly?: boolean }): Pr
     if (r.ok) {
       const data = mapSearch(await r.json())
       setCache(key, data)
+      putCachedArray(key, data)
+      // also cache individual videos for VideoCard ⚡ icon
+      for (const v of data) putCached(v)
       addQuota(COST_SEARCH) // นับเฉพาะยิงจริง ไม่นับ cache hit
       return data
     }
@@ -150,12 +160,17 @@ export async function searchVideos(q: string, opts?: { liveOnly?: boolean }): Pr
   const url = `${DIRECT}/search?part=snippet&type=video&maxResults=24&q=${encodeURIComponent(query)}${liveOnly ? '&eventType=live' : ''}&key=${apiKey}`
   const data = mapSearch(await fetchJson(url))
   setCache(key, data)
+  putCachedArray(key, data)
+  for (const v of data) putCached(v)
   addQuota(COST_SEARCH)
   return data
 }
 
 export async function getTrending(): Promise<VideoItem[]> {
   const key = 'trending:TH'
+  const cached = getCachedArray(key)
+  if (cached) return cached
+
   const hit = getCache(key)
   if (hit) return hit
 
@@ -164,6 +179,8 @@ export async function getTrending(): Promise<VideoItem[]> {
     if (r.ok) {
       const data = mapVideos(await r.json())
       setCache(key, data)
+      putCachedArray(key, data)
+      for (const v of data) putCached(v)
       addQuota(COST_TRENDING)
       return data
     }
@@ -176,6 +193,8 @@ export async function getTrending(): Promise<VideoItem[]> {
   const url = `${DIRECT}/videos?part=snippet,status&chart=mostPopular&regionCode=TH&maxResults=24&key=${apiKey}`
   const data = mapVideos(await fetchJson(url))
   setCache(key, data)
+  putCachedArray(key, data)
+  for (const v of data) putCached(v)
   addQuota(COST_TRENDING)
   return data
 }
@@ -203,11 +222,17 @@ function mapPlaylist(json: unknown): VideoItem[] {
 
 export async function fetchPlaylistItems(listId: string): Promise<VideoItem[]> {
   if (!/^[A-Za-z0-9_-]+$/.test(listId)) throw new Error('ลิงก์ไม่ถูกต้อง: หา playlist id ไม่เจอ')
+  const key = listId
+  const cached = getCachedArray(key)
+  if (cached) return cached
+
   try {
     const r = await fetch(`/api/search?type=playlist&listId=${encodeURIComponent(listId)}`)
     if (!r.ok) quotaError(r.status)
     const data = mapPlaylist(await r.json())
     if (data.length === 0) throw new Error('เพลย์ลิสต์ว่าง / ส่วนตัว / ไม่มีสิทธิ์เข้าถึง')
+    putCachedArray(key, data)
+    for (const v of data) putCached(v)
     addQuota(Math.max(1, Math.ceil(data.length / 50)) * COST_PLAYLIST)
     return data
   } catch (e) {
@@ -218,6 +243,8 @@ export async function fetchPlaylistItems(listId: string): Promise<VideoItem[]> {
     const url = `${DIRECT}/playlistItems?part=snippet&maxResults=50&playlistId=${encodeURIComponent(listId)}&key=${apiKey}`
     const data = mapPlaylist(await fetchJson(url))
     if (data.length === 0) throw new Error('เพลย์ลิสต์ว่าง / ส่วนตัว / ไม่มีสิทธิ์เข้าถึง')
+    putCachedArray(key, data)
+    for (const v of data) putCached(v)
     addQuota(COST_PLAYLIST)
     return data
   }
