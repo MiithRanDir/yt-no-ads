@@ -123,8 +123,8 @@ export function putCachedArray(key: string, items: VideoItem[]): void {
   saveArray(map);
 }
 
-// Self-check: รันด้วย npx tsx src/lib/videoCache.ts
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Self-check: รันด้วย npx tsx src/lib/videoCache.ts (Node.js only)
+if (typeof process !== 'undefined' && process.argv && import.meta.url === `file://${process.argv[1]}`) {
   const item: VideoItem = { id: 'dQw4w9WgXcQ', title: 'Test', channel: 'Chan', thumb: 't.jpg' };
   putCached(item);
   const got = getCached(item.id);
