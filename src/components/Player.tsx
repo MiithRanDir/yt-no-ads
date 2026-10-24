@@ -15,6 +15,7 @@ interface Props {
   context?: string
   loopOne?: boolean
   onToggleLoop?: () => void
+  onToggleAudio?: () => void
   onPip?: () => void
   onToggleCar?: () => void
 }
@@ -29,6 +30,11 @@ interface ApiPlayer {
   getCurrentTime: () => number
   getDuration: () => number
   seekTo: (s: number, allowSeekAhead: boolean) => void
+  mute: () => void
+  unMute: () => void
+  isMuted: () => boolean
+  setVolume: (v: number) => void
+  getVolume: () => number
 }
 
 function fmt(s: number): string {
@@ -67,7 +73,7 @@ function plainSrc(id: string) {
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`
 }
 
-export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly, context, loopOne, onToggleLoop, onPip, onToggleCar }: Props) {
+export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly, context, loopOne, onToggleLoop, onToggleAudio, onPip, onToggleCar }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<ApiPlayer | null>(null)
@@ -85,10 +91,23 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   audioRef.current = audioOnly
   const loopRef = useRef(loopOne)
   loopRef.current = loopOne
+  const loopToggleRef = useRef(onToggleLoop)
+  loopToggleRef.current = onToggleLoop
+  const audioToggleRef = useRef(onToggleAudio)
+  audioToggleRef.current = onToggleAudio
+  const carToggleRef = useRef(onToggleCar)
+  carToggleRef.current = onToggleCar
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  const shuffleRef = useRef(onShuffle)
+  shuffleRef.current = onShuffle
+  const playingRef = useRef(false)
   // ponytail: state ไว้โชว์การ์ด Spotify — playing/progress อัปเดตจาก player ตรงๆ
   const [playing, setPlaying] = useState(false)
   const [ctl, setCtl] = useState(false)
   const [mini, setMini] = useState(false)
+  const miniRef = useRef(false)
+  miniRef.current = mini
   const [prog, setProg] = useState({ t: 0, d: 0 })
   if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null
 
@@ -97,13 +116,34 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   useEffect(() => {
     const ms = navigator.mediaSession
     if (!ms) return
-    const set = (a: MediaSessionAction, fn: () => void) => {
-      try { ms.setActionHandler(a, fn) } catch { /* browser นี้ไม่รองรับ */ }
+    const set = (a: MediaSessionAction, fn: (d?: { seekTime?: number; seekOffset?: number; playbackRate?: number }) => void) => {
+      try { ms.setActionHandler(a as MediaSessionAction, fn as MediaSessionActionHandler) } catch { /* browser นี้ไม่รองรับ */ }
     }
-    set('play', () => { try { playerRef.current?.playVideo() } catch { /* ข้าม */ } try { ms.playbackState = 'playing' } catch { /* ข้าม */ } })
-    set('pause', () => { try { playerRef.current?.pauseVideo() } catch { /* ข้าม */ } try { ms.playbackState = 'paused' } catch { /* ข้าม */ } })
+    const safe = (fn: () => void) => () => { try { fn() } catch { /* ข้าม */ } }
+    set('play', safe(() => { playerRef.current?.playVideo() }))
+    set('pause', safe(() => { playerRef.current?.pauseVideo() }))
     set('previoustrack', () => prevRef.current?.())
     set('nexttrack', () => nextRef.current?.())
+    set('seekbackward', (d) => safe(() => {
+      const p = playerRef.current
+      if (!p) return
+      const off = d?.seekOffset ?? 10
+      p.seekTo(Math.max(0, p.getCurrentTime() - off), true)
+    })())
+    set('seekforward', (d) => safe(() => {
+      const p = playerRef.current
+      if (!p) return
+      const off = d?.seekOffset ?? 10
+      p.seekTo(Math.min(p.getDuration(), p.getCurrentTime() + off), true)
+    })())
+    set('seekto', (d) => safe(() => {
+      if (d?.seekTime != null) playerRef.current?.seekTo(d.seekTime, true)
+    })())
+    set('toggleplaypause' as MediaSessionAction, safe(() => {
+      const p = playerRef.current
+      if (!p) return
+      if (playingRef.current) p.pauseVideo(); else p.playVideo()
+    }))
   }, [])
 
   // เปิดจอเพลง: ล็อกสกรอลล์พื้นหลังไว้ จอเดียวพอ ไม่ซ้อนกัน
@@ -113,6 +153,14 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = prev }
   }, [audioOnly, track])
+
+  // ponytail: ส่งสถานะ play/pause ให้ OS — ปุ่ม hardware/lock screen ได้ icon ตรงกัน
+  useEffect(() => {
+    playingRef.current = playing
+    const ms = navigator.mediaSession
+    if (!ms) return
+    try { ms.playbackState = playing ? 'playing' : 'paused' } catch { /* browser เก่า */ }
+  }, [playing])
 
   // ชื่อเพลง/ปกขึ้นจอรถ + lock screen
   useEffect(() => {
@@ -186,17 +234,95 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
     try { playerRef.current?.setPlaybackQuality(audioOnly ? 'tiny' : 'auto') } catch { /* ยังไม่พร้อม */ }
   }, [audioOnly, id])
 
-  // แถบเวลา: ถาม player ทุกวิ (โหมดเสียงเท่านั้น)
+  // แถบเวลา + Media Session positionState: ถาม player ทุกวิขณะเล่น
+  // ponytail: setProg เฉพาะ audioOnly เพื่อไม่ให้วิดีโอปกติ re-render ทุกวิ
   useEffect(() => {
-    if (!audioOnly) return
+    if (!(audioOnly || playing)) return
+    const ms = navigator.mediaSession
     const iv = window.setInterval(() => {
       try {
         const p = playerRef.current
-        if (p) setProg({ t: p.getCurrentTime() || 0, d: p.getDuration() || 0 })
+        if (!p) return
+        const t = p.getCurrentTime() || 0
+        const d = p.getDuration() || 0
+        if (audioOnly) setProg({ t, d })
+        if (ms && typeof (ms as unknown as { setPositionState?: unknown }).setPositionState === 'function' && d > 0) {
+          try { ms.setPositionState({ duration: d, position: t, playbackRate: 1 }) } catch { /* browser เก่า */ }
+        }
       } catch { /* ข้าม */ }
     }, 1000)
     return () => window.clearInterval(iv)
-  }, [audioOnly, id])
+  }, [audioOnly, playing, id])
+
+  // ponytail: คีย์ลัดสไตล์ YouTube — Space/K เล่น-หยุด, M mute, ←/→ ±5s, Shift+←/→ ±10s,
+  // ↑/↓ ปรับเสียง, L loop, A เสียงอย่างเดียว, C โหมดรถ, F เต็มจอ, Shift+N/P ข้ามเพลง, Esc/X ปิด
+  // ผูกผลึกกับ refs เพื่อติด listener แค่ครั้งเดียวตลอด session ที่ Player mount
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (e.altKey || e.metaKey || e.ctrlKey) return
+      const p = playerRef.current
+      const k = e.key
+      const kl = k.length === 1 ? k.toLowerCase() : k
+      const shift = e.shiftKey
+      const tryVol = (delta: number) => {
+        try {
+          if (!p) return
+          const cur = p.getVolume?.() ?? 50
+          p.setVolume(Math.min(100, Math.max(0, cur + delta)))
+        } catch { /* ข้าม */ }
+      }
+      const trySeek = (delta: number) => {
+        try {
+          if (!p) return
+          const dur = p.getDuration() || 0
+          const nt = Math.min(dur, Math.max(0, p.getCurrentTime() + delta))
+          p.seekTo(nt, true)
+        } catch { /* ข้าม */ }
+      }
+      // Shift + N/P — ข้ามเพลง (เดิมใน App ย้ายมาไว้ที่นี่เพื่อให้ Player เป็นเจ้าของ shortcut)
+      if (shift && (kl === 'n' || kl === 'p')) {
+        e.preventDefault()
+        if (kl === 'n') nextRef.current?.(); else prevRef.current?.()
+        return
+      }
+      // Arrow keys — ห้ามดักถ้าไม่มี player พร้อม
+      if (k === 'ArrowLeft') { e.preventDefault(); trySeek(shift ? -10 : -5); return }
+      if (k === 'ArrowRight') { e.preventDefault(); trySeek(shift ? 10 : 5); return }
+      if (k === 'ArrowUp') { e.preventDefault(); tryVol(10); return }
+      if (k === 'ArrowDown') { e.preventDefault(); tryVol(-10); return }
+      if (k === 'Escape') {
+        e.preventDefault()
+        // ponytail: ถ้าเพิ่งย่อลงแถบล่าง → Esc = ขยายกลับ ถ้าไม่ได้อยู่ในโหมดย่อ → Esc = ปิด player
+        if (miniRef.current) setMini(false); else closeRef.current?.()
+        return
+      }
+      if (shift) return
+      if (k === ' ' || kl === 'k') {
+        e.preventDefault()
+        try { if (playingRef.current) p?.pauseVideo(); else p?.playVideo() } catch { /* ข้าม */ }
+        return
+      }
+      if (kl === 'm') {
+        e.preventDefault()
+        try { if (p?.isMuted()) p.unMute(); else p?.mute() } catch { /* ข้าม */ }
+        return
+      }
+      if (kl === 'l') { e.preventDefault(); loopToggleRef.current?.(); return }
+      if (kl === 'a') { e.preventDefault(); audioToggleRef.current?.(); return }
+      if (kl === 'c') { e.preventDefault(); carToggleRef.current?.(); return }
+      if (kl === 'f') {
+        e.preventDefault()
+        // ponytail: ตอนย่อลงแถบล่าง iframe สูง 2px — F ต้องขยายก่อน ไม่งั้น fullscreen กล่องจิ๋ว
+        if (miniRef.current) setMini(false); else full()
+        return
+      }
+      if (kl === 'x') { e.preventDefault(); closeRef.current?.(); return }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   function toggle() {
     try {
@@ -228,11 +354,11 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
     else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen()
   }
   return (
-    <div className="player-wrap" ref={wrapRef}>
+    <div className={['player-wrap', mini && !audioOnly && 'tucked'].filter(Boolean).join(' ')} ref={wrapRef}>
       <div className="player" ref={boxRef} />
       {audioOnly && track && !mini && (
         <div className="audiofull" style={{ '--art': `url("${track.thumb}")` } as CSSProperties}>
-          <button className="carfab" onClick={onToggleCar} title="โหมดรถ — ขยาย/ย่อ">🚗</button>
+          <button className="carfab" onClick={onToggleCar} title="โหมดรถ (C)">🚗</button>
           <div className="sp-top">
             <button className="sp-chev" onClick={() => setMini(true)} aria-label="ย่อ (เพลงเล่นต่อ)" title="ย่อ (เพลงเล่นต่อ)">⌄</button>
             <div className="sp-context">{context ?? 'กำลังเล่น'}</div>
@@ -251,7 +377,7 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
             {onShuffle ? <button className="sp-glyph" onClick={onShuffle} title="สุ่ม">🔀</button> : <span />}
             {onPrev ? <button className="sp-glyph big" onClick={onPrev} disabled={!hasPrev} title="ก่อนหน้า (Shift+P)">⏮</button> : <span />}
             {ctl ? (
-              <button className="bigplay" onClick={toggle} aria-label={playing ? 'หยุด' : 'เล่น'}>
+              <button className="bigplay" onClick={toggle} aria-label={playing ? 'หยุด (Space)' : 'เล่น (Space)'}>
                 {playing ? '⏸' : '▶'}
               </button>
             ) : (
@@ -259,26 +385,15 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
             )}
             {onNext ? <button className="sp-glyph big" onClick={onNext} disabled={!hasNext} title="ถัดไป (Shift+N)">⏭</button> : <span />}
             {onToggleLoop && (
-              <button className={loopOne ? 'sp-glyph' : 'sp-glyph off'} onClick={onToggleLoop} title="เล่นเพลงนี้ซ้ำ">
+              <button className={loopOne ? 'sp-glyph' : 'sp-glyph off'} onClick={onToggleLoop} title="เล่นเพลงนี้ซ้ำ (L)">
                 🔂
               </button>
             )}
-            <button className="sp-glyph" onClick={onClose} title="ปิด">✕</button>
+            <button className="sp-glyph" onClick={onClose} title="ปิด (Esc)">✕</button>
           </div>
           {onPip && (
             <button className="piphelp" onClick={onPip}>📺 เปิด PiP แล้วล็อกจอฟังต่อได้</button>
           )}
-        </div>
-      )}
-      {audioOnly && track && mini && (
-        <div className="minibar">
-          <img src={track.thumb} alt="" loading="lazy" />
-          <div className="mtitle">{track.title}</div>
-          {ctl && (
-            <button onClick={toggle} aria-label={playing ? 'หยุด' : 'เล่น'}>{playing ? '⏸' : '▶'}</button>
-          )}
-          <button onClick={() => setMini(false)} aria-label="ขยาย" title="ขยาย">▲</button>
-          <button onClick={onClose} aria-label="ปิด" title="ปิด">✕</button>
         </div>
       )}
       {!audioOnly && (
@@ -290,13 +405,24 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
             <button className="close" onClick={onShuffle} title="สุ่ม">🔀</button>
           </>
         )}
-        <button className="close" onClick={full}>
-          ⛶ เต็มจอ
-        </button>
-        <button className="close" onClick={onClose}>
-          ✕ ปิด
-        </button>
+        <button className="close" onClick={() => setMini(true)} title="ย่อลงแถบล่าง (เพลงเล่นต่อ)">🗕 ย่อ</button>
+        <button className="close" onClick={full} title="เต็มจอ (F)">⛶ เต็มจอ</button>
+        <button className="close" onClick={onClose} title="ปิด (Esc)">✕ ปิด</button>
       </div>
+      )}
+      {track && mini && (
+        <div className="minibar">
+          <img src={track.thumb} alt="" loading="lazy" />
+          <div className="mmeta">
+            <div className="mtitle">{track.title}</div>
+            {context && <div className="mcontext">{context}</div>}
+          </div>
+          {ctl && (
+            <button onClick={toggle} aria-label={playing ? 'หยุด (Space)' : 'เล่น (Space)'} title={playing ? 'หยุด (Space)' : 'เล่น (Space)'}>{playing ? '⏸' : '▶'}</button>
+          )}
+          <button onClick={() => setMini(false)} aria-label="ขยาย" title="ขยาย">▲</button>
+          <button onClick={onClose} aria-label="ปิด" title="ปิด (Esc)">✕</button>
+        </div>
       )}
     </div>
   )

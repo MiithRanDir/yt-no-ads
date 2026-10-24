@@ -82,8 +82,13 @@ span.sp-chev { visibility: hidden; }
 .carfab { position: absolute; top: 14px; right: 14px; width: 52px; height: 52px; border-radius: 50%; border: 1px solid #333; background: #212121; font-size: 24px; cursor: pointer; }
 .minibar { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 60; display: flex; align-items: center; gap: 10px; background: rgba(28,28,28,.94); border: 1px solid #333; border-radius: 14px; padding: 8px 10px; }
 .minibar img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
-.minibar .mtitle { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.minibar .mmeta { flex: 1; min-width: 0; text-align: left; }
+.minibar .mtitle { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.minibar .mcontext { color: rgba(255,255,255,.55); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 .minibar button { background: none; border: 0; color: #fff; font-size: 20px; cursor: pointer; padding: 6px; flex-shrink: 0; }
+/* ponytail: tucked = ย่อวิดีโอปกติลงแถบล่าง โดย iframe ยังเล่นต่อ (ไม่ unmount) */
+.player-wrap.tucked .player { aspect-ratio: auto; height: 2px; min-height: 0; overflow: hidden; opacity: .01; }
+.player-wrap.tucked .row { display: none; }
 /* ponytail: โหมดรถ — ขยายตามจอด้วย vmin/vh กดง่ายบนจอรถ (จอ landscape สูงจำกัด เลยคุมด้วย vh) */
 .carmode .audiofull { gap: clamp(8px, 2vmin, 18px); }
 .carmode .sp-art { width: min(560px, 90vw, 52dvh); }

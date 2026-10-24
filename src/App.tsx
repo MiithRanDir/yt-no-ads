@@ -249,21 +249,8 @@ export default function App() {
     push(queue[n])
   }
 
-  // ponytail: shortcut แบบ YouTube — Shift+N ถัดไป / Shift+P ก่อนหน้า (เฉพาะตอนมี queue)
-  // ไม่ทำงานตอนพิมพ์ในช่อง input/textarea
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
-      if (!e.shiftKey || queue.length < 2) return
-      const k = e.key.toLowerCase()
-      if (k === 'n') { e.preventDefault(); next() }
-      else if (k === 'p') { e.preventDefault(); prev() }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queue, qi])
+  // ponytail: คีย์ลัดทั้งชุด (Space/K, M, ←/→, ↑/↓, L/A/C/F/X/Esc, Shift+N/P) ย้ายไป Player หมดแล้ว
+  // — Player mount เฉพาะตอนมีเพลงเล่น ไม่กวนตอนพิมพ์ในช่องค้นหา
 
   // popup + เลือก playlist (เช็คซ้ำอยู่ใน picker)
   function pickAdd(pid: string) {
@@ -393,6 +380,7 @@ export default function App() {
           context={queuePid ? (playlists.find((p) => p.id === queuePid)?.name) : undefined}
           loopOne={loopOne}
           onToggleLoop={toggleLoop}
+          onToggleAudio={() => { const v = !audioOnly; setAudioOnly(v); try { localStorage.setItem('yt-audio-mode', v ? '1' : '0') } catch { /* ข้าม */ } }}
           onPip={pipHelp}
           onToggleCar={toggleCar}
           onClose={() => { setCurrent(null); setQueue([]) }}
