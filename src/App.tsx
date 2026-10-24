@@ -49,9 +49,12 @@ export default function App() {
   const quota = getQuota()
   void quotaTick
   const { history, push, clear } = useHistory()
-  const { playlists, create, remove, rename, addItem, removeItem, importItems, replaceAll, exportAll, importAll } = usePlaylists()
+  const { playlists, create, remove, rename, addItem, removeItem, reorderItem, importItems, replaceAll, exportAll, importAll } = usePlaylists()
   const [menu, setMenu] = useState<Menu>('home')
   const [activeId, setActiveId] = useState<string | null>(null)
+  // ponytail: drag state สำหรับ reorder ใน playlist detail — ลากการ์ด หรือใช้ ▲▼ (มือถือ/remote)
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [overIdx, setOverIdx] = useState<number | null>(null)
   const [queue, setQueue] = useState<VideoItem[]>([])
   const [qi, setQi] = useState(0)
   const [queuePid, setQueuePid] = useState<string | null>(null)
@@ -497,9 +500,39 @@ export default function App() {
           </div>
           <div className="grid">
             {active.items.map((v, i) => (
-              <div key={v.id} className="qwrap">
+              <div
+                key={v.id}
+                className={['qwrap', dragIdx === i && 'dragging', overIdx === i && dragIdx !== null && dragIdx !== i && 'drop-target'].filter(Boolean).join(' ')}
+                draggable
+                onDragStart={(e) => {
+                  setDragIdx(i)
+                  e.dataTransfer.effectAllowed = 'move'
+                  try { e.dataTransfer.setData('text/plain', String(i)) } catch { /* Safari เก่า */ }
+                }}
+                onDragEnd={() => { setDragIdx(null); setOverIdx(null) }}
+                onDragOver={(e) => {
+                  if (dragIdx === null) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  if (overIdx !== i) setOverIdx(i)
+                }}
+                onDragLeave={() => { if (overIdx === i) setOverIdx(null) }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  if (dragIdx !== null && dragIdx !== i) {
+                    reorderItem(active.id, dragIdx, i)
+                    flash(`ย้าย ${v.title.slice(0, 20)}… → ${i + 1}`)
+                  }
+                  setDragIdx(null); setOverIdx(null)
+                }}
+              >
+                <span className="drag-handle" aria-hidden="true" title="ลากเพื่อจัดลำดับ">⠿</span>
                 <VideoCard v={v} onPlay={(vv) => playQueue(active.items, active.items.findIndex((x) => x.id === vv.id), active.id)} onAdd={setPicker} />
-                <button className="clear" onClick={() => removeItem(active.id, v.id)} title="ลบออกจากเพลย์ลิสต์">ลบออก ({i + 1})</button>
+                <div className="qbtns">
+                  <button className="clear tiny" onClick={() => reorderItem(active.id, i, Math.max(0, i - 1))} disabled={i === 0} title="เลื่อนขึ้น">▲</button>
+                  <button className="clear tiny" onClick={() => reorderItem(active.id, i, Math.min(active.items.length - 1, i + 1))} disabled={i === active.items.length - 1} title="เลื่อนลง">▼</button>
+                  <button className="clear" onClick={() => removeItem(active.id, v.id)} title="ลบออกจากเพลย์ลิสต์">ลบ ({i + 1})</button>
+                </div>
               </div>
             ))}
           </div>

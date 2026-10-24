@@ -43,6 +43,21 @@ export function usePlaylists() {
       : p)))
   }
 
+  // ponytail: target index อ้างอิงรายการก่อนย้าย (drag ลงช่องว่างหลังการ์ด i = วางที่ i)
+  // ถ้าจะย้ายลง ต้องข้ามของที่ยังไม่ขยับ → afterRemove = to > from ? to - 1 : to
+  function reorderItem(pid: string, from: number, to: number) {
+    update((prev) => prev.map((p) => {
+      if (p.id !== pid) return p
+      const n = p.items.length
+      if (from < 0 || from >= n || to < 0 || to >= n || from === to) return p
+      const items = p.items.slice()
+      const [moved] = items.splice(from, 1)
+      const insertAt = to > from ? to - 1 : to
+      items.splice(insertAt, 0, moved)
+      return { ...p, items, updatedAt: Date.now() }
+    }))
+  }
+
   function importItems(pid: string, videos: VideoItem[]) {
     update((prev) => prev.map((p) => (p.id === pid
       ? { ...p, items: dedupe([...p.items, ...videos]).slice(0, MAX_ITEMS), updatedAt: Date.now() }
@@ -63,5 +78,5 @@ export function usePlaylists() {
     return pls
   }
 
-  return { playlists, create, remove, rename, addItem, removeItem, importItems, replaceAll, exportAll, importAll }
+  return { playlists, create, remove, rename, addItem, removeItem, reorderItem, importItems, replaceAll, exportAll, importAll }
 }
