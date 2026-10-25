@@ -55,6 +55,9 @@ export default function App() {
   // ponytail: drag state สำหรับ reorder ใน playlist detail — ลากการ์ด หรือใช้ ▲▼ (มือถือ/remote)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
+  // ponytail: candidate = ตำแหน่ง pointer ตอนกด handle (ยังไม่ activate drag จนกว่าจะเลื่อน > threshold)
+  // ใช้เพราะ iOS/Android เวลาแตะสั้นๆ ต้องไม่กลายเป็นลาก
+  const dragCandidate = useRef<{ idx: number; x: number; y: number; id: number } | null>(null)
   const [queue, setQueue] = useState<VideoItem[]>([])
   const [qi, setQi] = useState(0)
   const [queuePid, setQueuePid] = useState<string | null>(null)
@@ -502,31 +505,55 @@ export default function App() {
             {active.items.map((v, i) => (
               <div
                 key={v.id}
+                data-qidx={i}
                 className={['qwrap', dragIdx === i && 'dragging', overIdx === i && dragIdx !== null && dragIdx !== i && 'drop-target'].filter(Boolean).join(' ')}
-                draggable
-                onDragStart={(e) => {
-                  setDragIdx(i)
-                  e.dataTransfer.effectAllowed = 'move'
-                  try { e.dataTransfer.setData('text/plain', String(i)) } catch { /* Safari เก่า */ }
-                }}
-                onDragEnd={() => { setDragIdx(null); setOverIdx(null) }}
-                onDragOver={(e) => {
-                  if (dragIdx === null) return
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
-                  if (overIdx !== i) setOverIdx(i)
-                }}
-                onDragLeave={() => { if (overIdx === i) setOverIdx(null) }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  if (dragIdx !== null && dragIdx !== i) {
-                    reorderItem(active.id, dragIdx, i)
-                    flash(`ย้าย ${v.title.slice(0, 20)}… → ${i + 1}`)
-                  }
-                  setDragIdx(null); setOverIdx(null)
-                }}
               >
-                <span className="drag-handle" aria-hidden="true" title="ลากเพื่อจัดลำดับ">⠿</span>
+                <span
+                  className="drag-handle"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`จับลากเพื่อจัดลำดับเพลงที่ ${i + 1}`}
+                  title="จับที่นี่แล้วลากเพื่อจัดลำดับ"
+                  onPointerDown={(e) => {
+                    // ponytail: จด candidate ก่อน — ถ้าผู้ใช้แค่แตะสั้นๆ จะไม่กลายเป็นลาก
+                    if (e.button !== 0 && e.pointerType === 'mouse') return
+                    e.preventDefault()
+                    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+                    dragCandidate.current = { idx: i, x: e.clientX, y: e.clientY, id: e.pointerId }
+                  }}
+                  onPointerMove={(e) => {
+                    const c = dragCandidate.current
+                    if (!c || c.id !== e.pointerId || c.idx !== i) return
+                    const dx = e.clientX - c.x, dy = e.clientY - c.y
+                    if (dragIdx === null) {
+                      if (Math.hypot(dx, dy) < 6) return
+                      setDragIdx(i)
+                      document.body.classList.add('reorder-dragging')
+                    }
+                    e.preventDefault()
+                    const hit = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+                    const wrap = hit?.closest('.qwrap') as HTMLElement | null
+                    const idxRaw = wrap?.dataset.qidx
+                    const idx = idxRaw != null ? Number(idxRaw) : null
+                    if (idx != null && Number.isFinite(idx) && idx !== overIdx) setOverIdx(idx)
+                  }}
+                  onPointerUp={(e) => {
+                    const c = dragCandidate.current
+                    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* Safari เก่า */ }
+                    if (c && c.id === e.pointerId && dragIdx !== null && overIdx !== null && dragIdx !== overIdx) {
+                      reorderItem(active.id, dragIdx, overIdx)
+                      flash(`ย้าย ${v.title.slice(0, 20)}… → ${overIdx + 1}`)
+                    }
+                    dragCandidate.current = null
+                    setDragIdx(null); setOverIdx(null)
+                    document.body.classList.remove('reorder-dragging')
+                  }}
+                  onPointerCancel={() => {
+                    dragCandidate.current = null
+                    setDragIdx(null); setOverIdx(null)
+                    document.body.classList.remove('reorder-dragging')
+                  }}
+                >⠿</span>
                 <VideoCard v={v} onPlay={(vv) => playQueue(active.items, active.items.findIndex((x) => x.id === vv.id), active.id)} onAdd={setPicker} />
                 <div className="qbtns">
                   <button className="clear tiny" onClick={() => reorderItem(active.id, i, Math.max(0, i - 1))} disabled={i === 0} title="เลื่อนขึ้น">▲</button>

@@ -56,12 +56,13 @@ body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: system-ui, s
 .prow.rename button { padding: 8px 14px; border-radius: 16px; border: 0; background: #fff; cursor: pointer; font-weight: 600; white-space: nowrap; }
 .clear.danger { color: #ff9a9a; }
 .qwrap { display: flex; flex-direction: column; gap: 2px; position: relative; }
-.qwrap.dragging { opacity: .35; }
+.qwrap.dragging { opacity: .4; pointer-events: none; }
+.qwrap.dragging .drag-handle { pointer-events: auto; }
 .qwrap.drop-target { outline: 2px dashed #ff0033; outline-offset: 3px; border-radius: 10px; }
-.drag-handle { position: absolute; top: 6px; left: 6px; z-index: 3; padding: 4px 8px; font-size: 14px; line-height: 1; border-radius: 8px; background: rgba(0,0,0,.55); color: #ddd; cursor: grab; user-select: none; touch-action: none; }
-.drag-handle:active { cursor: grabbing; }
-/* ponytail: จอสัมผัส/TV ไม่มี drag → ซ่อน handle ไว้ก่อน (▲▼ ยังใช้ได้อยู่) */
-@media (hover: none) { .drag-handle { display: none; } }
+.drag-handle { position: absolute; top: 6px; left: 6px; z-index: 3; min-width: 40px; min-height: 32px; padding: 6px 10px; font-size: 18px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(0,0,0,.65); color: #fff; cursor: grab; user-select: none; touch-action: none; }
+.drag-handle:active { cursor: grabbing; background: rgba(255,0,51,.75); }
+body.reorder-dragging { user-select: none; cursor: grabbing; }
+body.reorder-dragging .qwrap { cursor: grabbing; }
 .qbtns { display: flex; gap: 4px; }
 .clear.tiny { padding: 4px 10px; min-width: 34px; font-size: 12px; }
 .clear.tiny:disabled { opacity: .35; cursor: default; }
