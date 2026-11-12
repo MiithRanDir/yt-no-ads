@@ -31,6 +31,34 @@ export default function App() {
   function toggleLoop() {
     setLoopOne((v) => { const n = !v; try { localStorage.setItem('yt-loop-one', n ? '1' : '0') } catch { /* ข้าม */ } return n })
   }
+  // ponytail: โหมดสุ่ม — เล่นสุ่มใน queue ไม่ซ้ำจนครบ playlist แล้วเริ่มรอบใหม่
+  // ชุดเพลงที่เล่นแล้วเก็บต่อ playlist ใน localStorage → ปิดแท็บแล้ว session สุ่มยังต่อ
+  const [shuffleOn, setShuffleOn] = useState(() => { try { return localStorage.getItem('yt-shuffle') === '1' } catch { return false } })
+  const playedRef = useRef<Set<string>>(new Set())
+  function savePlayed(pid: string | null) {
+    try { localStorage.setItem(`yt-shuffle-played-${pid ?? 'anon'}`, JSON.stringify([...playedRef.current])) } catch { /* ข้าม */ }
+  }
+  function loadPlayed(pid: string | null) {
+    try { playedRef.current = new Set<string>(JSON.parse(localStorage.getItem(`yt-shuffle-played-${pid ?? 'anon'}`) ?? '[]') as string[]) } catch { playedRef.current = new Set() }
+  }
+  // เริ่ม session สุ่มใหม่: ล้างชุดเก่า เหลือเพลงที่กำลังเล่นเป็นจุดเริ่ม
+  function startShuffleSession(pid: string | null, currentId?: string) {
+    playedRef.current = new Set(currentId ? [currentId] : [])
+    savePlayed(pid)
+  }
+  function enableShuffle() {
+    setShuffleOn(true)
+    try { localStorage.setItem('yt-shuffle', '1') } catch { /* ข้าม */ }
+  }
+  function toggleShuffle() {
+    if (shuffleOn) {
+      setShuffleOn(false)
+      try { localStorage.setItem('yt-shuffle', '0') } catch { /* ข้าม */ }
+      return
+    }
+    enableShuffle()
+    startShuffleSession(queuePid, current?.id) // เปิดใหม่กลางคัน = session ใหม่ เริ่มนับจากเพลงปัจจุบัน
+  }
   // ponytail: ปุ่มลัด PiP — เว็บสั่ง PiP ข้าม iframe ไม่ได้ เลยพากลับจอวิดีโอ + ชี้ปุ่ม PiP ของตัวเล่นให้
   const [pipHint, setPipHint] = useState(false)
   function pipHelp() {
@@ -143,6 +171,7 @@ export default function App() {
         setQueue(p.items)
         setQi(i)
         setQueuePid(p.id)
+        loadPlayed(p.id) // ถ้าเปิดโหมดสุ่มไว้ ต่อ session กันเล่นซ้ำจากรอบก่อน
         setCurrent(p.items[i])
         flash(`▶ ต่อจากเดิม: “${p.name}” เพลงที่ ${i + 1}/${p.items.length}`)
       } else {
@@ -219,6 +248,8 @@ export default function App() {
 
   function playQueue(items: VideoItem[], start: number, pid: string | null = null) {
     if (!items[start]) return
+    // เริ่มเล่น queue ใหม่กลางโหมดสุ่ม = เริ่ม session สุ่มใหม่จากเพลงแรกที่เปิด
+    if (shuffleOn) startShuffleSession(pid, items[start].id)
     setQueue(items)
     setQi(start)
     setQueuePid(pid)
@@ -230,7 +261,23 @@ export default function App() {
 
   function next() {
     if (queue.length === 0) return
-    const n = (qi + 1) % queue.length
+    let n: number
+    if (shuffleOn && queue.length > 1) {
+      const rest = queue.map((_, i) => i).filter((i) => !playedRef.current.has(queue[i].id))
+      if (rest.length === 0) {
+        // เล่นครบ playlist แล้ว → เคลียร์ session เริ่มรอบใหม่ (ไม่โยนกลับเพลงปัจจุบัน)
+        playedRef.current = new Set([queue[qi].id])
+        savePlayed(queuePid)
+        const fresh = queue.map((_, i) => i).filter((i) => i !== qi)
+        n = fresh[Math.floor(Math.random() * fresh.length)]
+      } else {
+        n = rest[Math.floor(Math.random() * rest.length)]
+      }
+      playedRef.current.add(queue[n].id)
+      savePlayed(queuePid)
+    } else {
+      n = (qi + 1) % queue.length
+    }
     setQi(n)
     setCurrent(queue[n])
     saveSession({ pid: queuePid, qi: n, item: queue[n] })
@@ -246,19 +293,7 @@ export default function App() {
     push(queue[n])
   }
 
-  function shuffle() {
-    if (queue.length < 2) return
-    const n = Math.floor(Math.random() * queue.length)
-    setQi(n)
-    setCurrent(queue[n])
-    saveSession({ pid: queuePid, qi: n, item: queue[n] })
-    push(queue[n])
-  }
-
   // ponytail: คีย์ลัดทั้งชุด (Space/K, M, ←/→, ↑/↓, L/A/C/F/X/Esc, Shift+N/P) ย้ายไป Player หมดแล้ว
-  // — Player mount เฉพาะตอนมีเพลงเล่น ไม่กวนตอนพิมพ์ในช่องค้นหา
-
-  // popup + เลือก playlist (เช็คซ้ำอยู่ใน picker)
   function pickAdd(pid: string) {
     if (!picker) return
     const p = playlists.find((x) => x.id === pid)
@@ -393,7 +428,8 @@ export default function App() {
           onEnded={queue.length > 1 ? next : undefined}
           onNext={queue.length > 1 ? next : undefined}
           onPrev={queue.length > 1 ? prev : undefined}
-          onShuffle={queue.length > 1 ? shuffle : undefined}
+          shuffleOn={shuffleOn}
+          onToggleShuffle={queue.length > 1 ? toggleShuffle : undefined}
           hasNext={queue.length > 1}
           hasPrev={queue.length > 1}
         />
@@ -497,7 +533,7 @@ export default function App() {
           <div className="prow rename">
             <input value={renameVal} onChange={(e) => setRenameVal(e.target.value)} placeholder="ชื่อเพลย์ลิสต์…" aria-label="ชื่อเพลย์ลิสต์" />
             <button onClick={() => { rename(active.id, renameVal) }} disabled={!renameVal.trim() || renameVal.trim() === active.name}>บันทึกชื่อ</button>
-            <button className="clear" onClick={() => { if (active.items.length > 0) playQueue(active.items, Math.floor(Math.random() * active.items.length), active.id) }} disabled={active.items.length === 0}>🔀 สุ่มเล่น</button>
+            <button className="clear" onClick={() => { if (active.items.length > 0) { const start = Math.floor(Math.random() * active.items.length); enableShuffle(); startShuffleSession(active.id, active.items[start].id); playQueue(active.items, start, active.id) } }} disabled={active.items.length === 0}>🔀 สุ่มเล่น</button>
             <button className="clear" onClick={() => { if (active.items.length > 0) playQueue(active.items, 0, active.id) }} disabled={active.items.length === 0}>▶ เล่นทั้งหมด</button>
             <button className="clear danger" onClick={() => { remove(active.id); setActiveId(null) }}>ลบเพลย์ลิสต์</button>
           </div>

@@ -6,5 +6,6 @@
 - Proxy: api/search.ts (GET only, 400 missing q, YT_API_KEY server)
 - Hook: useHistory localStorage 20
 - Playlist: src/lib/playlists.ts (pure, cap 20x200, listId regex) + usePlaylists ↔ App PlaylistBar/queue → Player IFrame API auto-next
+- Shuffle: ปุ่ม 🔀 = toggle (localStorage yt-shuffle) — next() สุ่มจากเพลงยังไม่เล่น ชุด played เก็บต่อ playlist (yt-shuffle-played-<pid>) ครบ playlist แล้วเคลียร์; playQueue/resume เริ่ม/ต่อ session
 - Proxy: api/search.ts + type=playlist (loop 4 หน้า, filter private/deleted, cache 1 ชม.)
 - Deploy: Vercel + vercel.json

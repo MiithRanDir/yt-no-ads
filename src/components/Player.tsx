@@ -7,7 +7,8 @@ interface Props {
   onEnded?: () => void
   onNext?: () => void
   onPrev?: () => void
-  onShuffle?: () => void
+  shuffleOn?: boolean
+  onToggleShuffle?: () => void
   hasNext?: boolean
   hasPrev?: boolean
   track?: { title: string; channel: string; thumb: string }
@@ -73,7 +74,7 @@ function plainSrc(id: string) {
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`
 }
 
-export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle, hasNext, hasPrev, track, audioOnly, context, loopOne, onToggleLoop, onToggleAudio, onPip, onToggleCar }: Props) {
+export default function Player({ id, onClose, onEnded, onNext, onPrev, shuffleOn, onToggleShuffle, hasNext, hasPrev, track, audioOnly, context, loopOne, onToggleLoop, onToggleAudio, onPip, onToggleCar }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<ApiPlayer | null>(null)
@@ -99,8 +100,6 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
   carToggleRef.current = onToggleCar
   const closeRef = useRef(onClose)
   closeRef.current = onClose
-  const shuffleRef = useRef(onShuffle)
-  shuffleRef.current = onShuffle
   const playingRef = useRef(false)
   // ponytail: state ไว้โชว์การ์ด Spotify — playing/progress อัปเดตจาก player ตรงๆ
   const [playing, setPlaying] = useState(false)
@@ -374,7 +373,7 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
           </div>
           <div className="ptime"><span>{fmt(prog.t)}</span><span>-{fmt(Math.max(0, prog.d - prog.t))}</span></div>
           <div className="arow">
-            {onShuffle ? <button className="sp-glyph" onClick={onShuffle} title="สุ่ม">🔀</button> : <span />}
+            {onToggleShuffle ? <button className={shuffleOn ? 'sp-glyph' : 'sp-glyph off'} onClick={onToggleShuffle} title="โหมดสุ่ม — ไม่เล่นซ้ำจนครบ playlist แล้วเริ่มรอบใหม่">🔀</button> : <span />}
             {onPrev ? <button className="sp-glyph big" onClick={onPrev} disabled={!hasPrev} title="ก่อนหน้า (Shift+P)">⏮</button> : <span />}
             {ctl ? (
               <button className="bigplay" onClick={toggle} aria-label={playing ? 'หยุด (Space)' : 'เล่น (Space)'}>
@@ -398,11 +397,11 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, onShuffle
       )}
       {!audioOnly && (
       <div className="row">
-        {(onPrev || onNext || onShuffle) && (
+        {(onPrev || onNext || onToggleShuffle) && (
           <>
             <button className="close" onClick={onPrev} disabled={!hasPrev} title="ก่อนหน้า (Shift+P)">‹</button>
             <button className="close" onClick={onNext} disabled={!hasNext} title="ถัดไป (Shift+N)">›</button>
-            <button className="close" onClick={onShuffle} title="สุ่ม">🔀</button>
+            <button className={shuffleOn ? 'close' : 'close off'} onClick={onToggleShuffle} title="โหมดสุ่ม — ไม่เล่นซ้ำจนครบ playlist แล้วเริ่มรอบใหม่">🔀</button>
           </>
         )}
         <button className="close" onClick={() => setMini(true)} title="ย่อลงแถบล่าง (เพลงเล่นต่อ)">🗕 ย่อ</button>
