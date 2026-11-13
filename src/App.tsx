@@ -57,7 +57,12 @@ export default function App() {
       return
     }
     enableShuffle()
-    startShuffleSession(queuePid, current?.id) // เปิดใหม่กลางคัน = session ใหม่ เริ่มนับจากเพลงปัจจุบัน
+    // เปิดโหมด = ต่อ session เดิม ห้ามเคลียร์ — ล้างเมื่อเล่นครบ playlist เท่านั้น (ปุ่ม "🔀 สุ่มเล่น" คือทางเริ่มใหม่ชัดๆ)
+    loadPlayed(queuePid)
+    if (current && !playedRef.current.has(current.id)) {
+      playedRef.current.add(current.id)
+      savePlayed(queuePid)
+    }
   }
   // ponytail: ปุ่มลัด PiP — เว็บสั่ง PiP ข้าม iframe ไม่ได้ เลยพากลับจอวิดีโอ + ชี้ปุ่ม PiP ของตัวเล่นให้
   const [pipHint, setPipHint] = useState(false)
@@ -248,8 +253,16 @@ export default function App() {
 
   function playQueue(items: VideoItem[], start: number, pid: string | null = null) {
     if (!items[start]) return
-    // เริ่มเล่น queue ใหม่กลางโหมดสุ่ม = เริ่ม session สุ่มใหม่จากเพลงแรกที่เปิด
-    if (shuffleOn) startShuffleSession(pid, items[start].id)
+    // playlist เดิมที่เล่นอยู่ = เปลี่ยนเพลงกลาง session → ต่อชุดกันซ้ำ (เคลียร์เมื่อครบรอบเท่านั้น)
+    // playlist ใหม่ = เริ่ม session สุ่มใหม่จากเพลงแรกที่เปิด
+    if (shuffleOn) {
+      if (pid === queuePid && queue.length > 0) {
+        playedRef.current.add(items[start].id)
+        savePlayed(pid)
+      } else {
+        startShuffleSession(pid, items[start].id)
+      }
+    }
     setQueue(items)
     setQi(start)
     setQueuePid(pid)
