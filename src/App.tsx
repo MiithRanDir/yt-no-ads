@@ -9,6 +9,7 @@ import { usePlaylists } from './hooks/usePlaylists'
 import { debounce, fetchPlaylistItems, getTrending, searchVideos, type VideoItem } from './lib/youtube'
 import { COST_PLAYLIST, getQuota, DAILY_LIMIT } from './lib/quota'
 import { parseYoutubeListId, exportJSON as playlistsToJSON } from './lib/playlists'
+import { advance, currentId, newRound, playId, repairOrder, retreat, type ShuffleRound, type ShuffleTrack } from './lib/shuffle'
 import { loadSession, saveSession } from './lib/session'
 import { syncLogin, syncLogout, syncPull, syncPush } from './lib/sync'
 
@@ -31,38 +32,61 @@ export default function App() {
   function toggleLoop() {
     setLoopOne((v) => { const n = !v; try { localStorage.setItem('yt-loop-one', n ? '1' : '0') } catch { /* ข้าม */ } return n })
   }
-  // ponytail: โหมดสุ่ม — เล่นสุ่มใน queue ไม่ซ้ำจนครบ playlist แล้วเริ่มรอบใหม่
-  // ชุดเพลงที่เล่นแล้วเก็บต่อ playlist ใน localStorage → ปิดแท็บแล้ว session สุ่มยังต่อ
+  // ponytail: smart shuffle — ตรึงลำดับสุ่มทั้งรอบ (permutation) ต่อ playlist แล้วเดินตามลำดับนั้น
+  // เก็บ {order, pos} ใน localStorage = ปิดจอ/เปิดแอปใหม่/สลับ playlist แล้วต่อรอบเดิมได้ (ของเดิมล้าง session ทุกครั้ง = เพลงวนซ้ำ)
   const [shuffleOn, setShuffleOn] = useState(() => { try { return localStorage.getItem('yt-shuffle') === '1' } catch { return false } })
-  const playedRef = useRef<Set<string>>(new Set())
-  function savePlayed(pid: string | null) {
-    try { localStorage.setItem(`yt-shuffle-played-${pid ?? 'anon'}`, JSON.stringify([...playedRef.current])) } catch { /* ข้าม */ }
+  const roundRef = useRef<ShuffleRound | null>(null)
+  const roundPidRef = useRef<string | null>(null)
+  function roundKey(pid: string | null) {
+    return `yt-shuffle-round-${pid ?? 'anon'}`
   }
-  function loadPlayed(pid: string | null) {
-    try { playedRef.current = new Set<string>(JSON.parse(localStorage.getItem(`yt-shuffle-played-${pid ?? 'anon'}`) ?? '[]') as string[]) } catch { playedRef.current = new Set() }
+  function saveRound(pid: string | null) {
+    try { if (roundRef.current) localStorage.setItem(roundKey(pid), JSON.stringify(roundRef.current)) } catch { /* ข้าม */ }
   }
-  // เริ่ม session สุ่มใหม่: ล้างชุดเก่า เหลือเพลงที่กำลังเล่นเป็นจุดเริ่ม
-  function startShuffleSession(pid: string | null, currentId?: string) {
-    playedRef.current = new Set(currentId ? [currentId] : [])
-    savePlayed(pid)
+  function readRound(pid: string | null): ShuffleRound | null {
+    try {
+      const raw = localStorage.getItem(roundKey(pid))
+      if (!raw) return null
+      const r = JSON.parse(raw) as Partial<ShuffleRound>
+      if (!Array.isArray(r.order) || typeof r.pos !== 'number') return null
+      return { order: r.order, pos: r.pos, recent: Array.isArray(r.recent) ? r.recent : [], done: Array.isArray(r.done) ? r.done : [], resume: typeof r.resume === 'string' ? r.resume : undefined }
+    } catch { return null }
   }
-  function enableShuffle() {
-    setShuffleOn(true)
-    try { localStorage.setItem('yt-shuffle', '1') } catch { /* ข้าม */ }
+  // ข้อมูลจากเวอร์ชันก่อน (yt-shuffle-played-*) → ใช้กันเพลงที่เพิ่งเล่นรอบเก่าไม่ให้กลับมาเปิดเร็ว
+  function legacyPlayed(pid: string | null): string[] {
+    try { return JSON.parse(localStorage.getItem(`yt-shuffle-played-${pid ?? 'anon'}`) ?? '[]') as string[] } catch { return [] }
+  }
+  function tracksOf(items: VideoItem[]): ShuffleTrack[] {
+    return items.map((v) => ({ id: v.id, channel: v.channel }))
+  }
+  // คืนลำดับรอบของ playlist นี้เสมอ: หน่วยความจำ → localStorage → สร้างใหม่ แล้วชี้ไปที่เพลงปัจจุบัน
+  function ensureRound(items: VideoItem[], pid: string | null, playing?: string): ShuffleRound {
+    const t = tracksOf(items)
+    const stored = roundPidRef.current === pid && roundRef.current ? roundRef.current : readRound(pid)
+    roundPidRef.current = pid
+    const legacy = legacyPlayed(pid)
+    let r = stored ?? newRound(t, { avoidFirst: legacy, recent: legacy })
+    r = repairOrder(r, t)
+    // only จิ้มเพลงใหม่เมื่อรอบยังไม่ได้ชี้อยู่ — ไม่งั้น next() จะมาล้าง resume ของปุ่ม ⏮
+    if (playing && currentId(r) !== playing) r = playId(r, playing)
+    roundRef.current = r
+    saveRound(pid)
+    return r
+  }
+  // เริ่มรอบใหม่ทั้งรอบ (ปุ่ม "🔀 สุ่มเล่น") — เพลงที่กดคือจุดเริ่ม
+  function restartRound(items: VideoItem[], pid: string | null, playing: string) {
+    roundPidRef.current = pid
+    roundRef.current = playId(newRound(tracksOf(items)), playing)
+    saveRound(pid)
+  }
+  function setShuffle(on: boolean) {
+    setShuffleOn(on)
+    try { localStorage.setItem('yt-shuffle', on ? '1' : '0') } catch { /* ข้าม */ }
   }
   function toggleShuffle() {
-    if (shuffleOn) {
-      setShuffleOn(false)
-      try { localStorage.setItem('yt-shuffle', '0') } catch { /* ข้าม */ }
-      return
-    }
-    enableShuffle()
-    // เปิดโหมด = ต่อ session เดิม ห้ามเคลียร์ — ล้างเมื่อเล่นครบ playlist เท่านั้น (ปุ่ม "🔀 สุ่มเล่น" คือทางเริ่มใหม่ชัดๆ)
-    loadPlayed(queuePid)
-    if (current && !playedRef.current.has(current.id)) {
-      playedRef.current.add(current.id)
-      savePlayed(queuePid)
-    }
+    if (shuffleOn) { setShuffle(false); return } // ปิดโหมด = จำรอบไว้ต่อครั้งหน้า ห้ามล้าง
+    setShuffle(true)
+    if (queue.length > 1) ensureRound(queue, queuePid, current?.id ?? queue[qi].id)
   }
   // ponytail: ปุ่มลัด PiP — เว็บสั่ง PiP ข้าม iframe ไม่ได้ เลยพากลับจอวิดีโอ + ชี้ปุ่ม PiP ของตัวเล่นให้
   const [pipHint, setPipHint] = useState(false)
@@ -176,7 +200,7 @@ export default function App() {
         setQueue(p.items)
         setQi(i)
         setQueuePid(p.id)
-        loadPlayed(p.id) // ถ้าเปิดโหมดสุ่มไว้ ต่อ session กันเล่นซ้ำจากรอบก่อน
+        ensureRound(p.items, p.id, p.items[i].id) // เปิดแอปใหม่ → ต่อรอบสุ่มเดิม ไม่เริ่มนับหนึ่งใหม่
         setCurrent(p.items[i])
         flash(`▶ ต่อจากเดิม: “${p.name}” เพลงที่ ${i + 1}/${p.items.length}`)
       } else {
@@ -253,16 +277,8 @@ export default function App() {
 
   function playQueue(items: VideoItem[], start: number, pid: string | null = null) {
     if (!items[start]) return
-    // playlist เดิมที่เล่นอยู่ = เปลี่ยนเพลงกลาง session → ต่อชุดกันซ้ำ (เคลียร์เมื่อครบรอบเท่านั้น)
-    // playlist ใหม่ = เริ่ม session สุ่มใหม่จากเพลงแรกที่เปิด
-    if (shuffleOn) {
-      if (pid === queuePid && queue.length > 0) {
-        playedRef.current.add(items[start].id)
-        savePlayed(pid)
-      } else {
-        startShuffleSession(pid, items[start].id)
-      }
-    }
+    // กดเพลงไหนก็ต่อรอบสุ่มเดิม (round เก็บไว้ต่อ playlist) — เพลงที่กดถูกนับว่าฟังแล้วของรอบนี้ โดยไม่สลับลำดับเพลงอื่น
+    if (shuffleOn) ensureRound(items, pid, items[start].id)
     setQueue(items)
     setQi(start)
     setQueuePid(pid)
@@ -272,22 +288,20 @@ export default function App() {
     window.scrollTo({ top: 0 })
   }
 
+  // id จากรอบสุ่ม → ตำแหน่งใน queue (ไม่เจอ = เพลงเพิ่งถูกลบออกไป → ถอยกลับไปไล่ลำดับปกติ)
+  function trackIndex(id: string | undefined, fallback: number) {
+    const at = id ? queue.findIndex((v) => v.id === id) : -1
+    return at >= 0 ? at : fallback
+  }
+
   function next() {
     if (queue.length === 0) return
     let n: number
     if (shuffleOn && queue.length > 1) {
-      const rest = queue.map((_, i) => i).filter((i) => !playedRef.current.has(queue[i].id))
-      if (rest.length === 0) {
-        // เล่นครบ playlist แล้ว → เคลียร์ session เริ่มรอบใหม่ (ไม่โยนกลับเพลงปัจจุบัน)
-        playedRef.current = new Set([queue[qi].id])
-        savePlayed(queuePid)
-        const fresh = queue.map((_, i) => i).filter((i) => i !== qi)
-        n = fresh[Math.floor(Math.random() * fresh.length)]
-      } else {
-        n = rest[Math.floor(Math.random() * rest.length)]
-      }
-      playedRef.current.add(queue[n].id)
-      savePlayed(queuePid)
+      const r = advance(ensureRound(queue, queuePid, current?.id ?? queue[qi].id), tracksOf(queue))
+      roundRef.current = r
+      saveRound(queuePid)
+      n = trackIndex(currentId(r), (qi + 1) % queue.length)
     } else {
       n = (qi + 1) % queue.length
     }
@@ -299,7 +313,15 @@ export default function App() {
 
   function prev() {
     if (queue.length === 0) return
-    const n = (qi - 1 + queue.length) % queue.length
+    let n: number
+    if (shuffleOn && queue.length > 1) {
+      const r = retreat(ensureRound(queue, queuePid, current?.id ?? queue[qi].id), tracksOf(queue))
+      roundRef.current = r
+      saveRound(queuePid)
+      n = trackIndex(currentId(r), (qi - 1 + queue.length) % queue.length)
+    } else {
+      n = (qi - 1 + queue.length) % queue.length
+    }
     setQi(n)
     setCurrent(queue[n])
     saveSession({ pid: queuePid, qi: n, item: queue[n] })
@@ -437,7 +459,7 @@ export default function App() {
           onToggleAudio={() => { const v = !audioOnly; setAudioOnly(v); try { localStorage.setItem('yt-audio-mode', v ? '1' : '0') } catch { /* ข้าม */ } }}
           onPip={pipHelp}
           onToggleCar={toggleCar}
-          onClose={() => { setCurrent(null); setQueue([]) }}
+          onClose={() => { setCurrent(null); setQueue([]); setQi(0); setQueuePid(null) }}
           onEnded={queue.length > 1 ? next : undefined}
           onNext={queue.length > 1 ? next : undefined}
           onPrev={queue.length > 1 ? prev : undefined}
@@ -546,7 +568,7 @@ export default function App() {
           <div className="prow rename">
             <input value={renameVal} onChange={(e) => setRenameVal(e.target.value)} placeholder="ชื่อเพลย์ลิสต์…" aria-label="ชื่อเพลย์ลิสต์" />
             <button onClick={() => { rename(active.id, renameVal) }} disabled={!renameVal.trim() || renameVal.trim() === active.name}>บันทึกชื่อ</button>
-            <button className="clear" onClick={() => { if (active.items.length > 0) { const start = Math.floor(Math.random() * active.items.length); enableShuffle(); startShuffleSession(active.id, active.items[start].id); playQueue(active.items, start, active.id) } }} disabled={active.items.length === 0}>🔀 สุ่มเล่น</button>
+            <button className="clear" onClick={() => { if (active.items.length > 0) { const start = Math.floor(Math.random() * active.items.length); setShuffle(true); restartRound(active.items, active.id, active.items[start].id); playQueue(active.items, start, active.id) } }} disabled={active.items.length === 0}>🔀 สุ่มเล่น</button>
             <button className="clear" onClick={() => { if (active.items.length > 0) playQueue(active.items, 0, active.id) }} disabled={active.items.length === 0}>▶ เล่นทั้งหมด</button>
             <button className="clear danger" onClick={() => { remove(active.id); setActiveId(null) }}>ลบเพลย์ลิสต์</button>
           </div>

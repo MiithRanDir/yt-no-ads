@@ -373,7 +373,7 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, shuffleOn
           </div>
           <div className="ptime"><span>{fmt(prog.t)}</span><span>-{fmt(Math.max(0, prog.d - prog.t))}</span></div>
           <div className="arow">
-            {onToggleShuffle ? <button className={shuffleOn ? 'sp-glyph' : 'sp-glyph off'} onClick={onToggleShuffle} title="โหมดสุ่ม — ไม่เล่นซ้ำจนครบ playlist แล้วเริ่มรอบใหม่">🔀</button> : <span />}
+            {onToggleShuffle ? <button className={shuffleOn ? 'sp-glyph' : 'sp-glyph off'} onClick={onToggleShuffle} title="สุ่มอัจฉริยะ — ไม่เล่นซ้ำจนครบ playlist, ไม่เล่นศิลปินเดิมติดกัน, ต่อรอบเดิมแม้ปิดจอหรือเปิดแอปใหม่">🔀</button> : <span />}
             {onPrev ? <button className="sp-glyph big" onClick={onPrev} disabled={!hasPrev} title="ก่อนหน้า (Shift+P)">⏮</button> : <span />}
             {ctl ? (
               <button className="bigplay" onClick={toggle} aria-label={playing ? 'หยุด (Space)' : 'เล่น (Space)'}>
@@ -401,7 +401,7 @@ export default function Player({ id, onClose, onEnded, onNext, onPrev, shuffleOn
           <>
             <button className="close" onClick={onPrev} disabled={!hasPrev} title="ก่อนหน้า (Shift+P)">‹</button>
             <button className="close" onClick={onNext} disabled={!hasNext} title="ถัดไป (Shift+N)">›</button>
-            <button className={shuffleOn ? 'close' : 'close off'} onClick={onToggleShuffle} title="โหมดสุ่ม — ไม่เล่นซ้ำจนครบ playlist แล้วเริ่มรอบใหม่">🔀</button>
+            <button className={shuffleOn ? 'close' : 'close off'} onClick={onToggleShuffle} title="สุ่มอัจฉริยะ — ไม่เล่นซ้ำจนครบ playlist, ไม่เล่นศิลปินเดิมติดกัน, ต่อรอบเดิมแม้ปิดจอหรือเปิดแอปใหม่">🔀</button>
           </>
         )}
         <button className="close" onClick={() => setMini(true)} title="ย่อลงแถบล่าง (เพลงเล่นต่อ)">🗕 ย่อ</button>
